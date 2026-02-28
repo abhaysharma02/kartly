@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
+const TokenTracker = require('../models/TokenTracker');
+const Vendor = require('../models/Vendor');
 // Note: io is imported dynamically in index.js, we will pass it via req.app.get('io')
 
 const razorpay = new Razorpay({
@@ -14,8 +16,16 @@ exports.createOrder = async (req, res) => {
         const { vendorId } = req.params; // From the public URL /q/:vendorId/order
         const { items, subtotal, taxAmount, totalAmount } = req.body;
 
-        // 1. Generate Token Number (simple sequence or random for stub)
-        const tokenNumber = Math.floor(100 + Math.random() * 900);
+        // 1. Generate Token Number (Daily Reset System)
+        // Get current date string in YYYY-MM-DD
+        const today = new Date().toISOString().split('T')[0];
+
+        const tokenRecord = await TokenTracker.findOneAndUpdate(
+            { vendorId, date: today },
+            { $inc: { lastToken: 1 } },
+            { new: true, upsert: true }
+        );
+        const tokenNumber = tokenRecord.lastToken;
 
         // 2. Create Mongoose Order
         const dbOrder = new Order({
@@ -125,5 +135,29 @@ exports.razorpayWebhook = async (req, res) => {
     } catch (error) {
         console.error('Webhook error:', error);
         res.status(500).json({ error: 'Webhook processing failed' });
+    }
+};
+
+exports.getOrderById = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Fetch just the vendor shopName for the receipt
+        const vendor = await Vendor.findById(order.vendorId).select('shopName name');
+
+        res.json({
+            success: true,
+            order,
+            vendor
+        });
+
+    } catch (error) {
+        console.error('Fetch order error:', error);
+        res.status(500).json({ error: 'Failed to fetch order details' });
     }
 };

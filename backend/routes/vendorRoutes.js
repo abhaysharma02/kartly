@@ -22,4 +22,7 @@ router.put('/menu-items/:id', menuController.updateMenuItem);
 // QR Generation Check
 router.get('/qr', vendorController.generateQR);
 
+// Orders
+router.put('/orders/:orderId/status', vendorController.updateOrderStatus);
+
 module.exports = router;

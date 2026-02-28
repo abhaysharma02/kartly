@@ -63,6 +63,14 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('join_order_room', (data) => {
+        if (data && data.orderId) {
+            const room = `order_${data.orderId}`;
+            socket.join(room);
+            console.log(`Socket ${socket.id} joined room ${room}`);
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
     });

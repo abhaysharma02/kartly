@@ -1,6 +1,7 @@
 const Category = require('../models/Category');
 const MenuItem = require('../models/MenuItem');
 const Subscription = require('../models/Subscription');
+const Order = require('../models/Order');
 
 exports.generateQR = async (req, res) => {
     try {
@@ -40,5 +41,45 @@ exports.generateQR = async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ error: 'Server error generating QR code' });
+    }
+};
+
+exports.updateOrderStatus = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        const { orderId } = req.params;
+        const { status } = req.body;
+
+        const validStatuses = ['Pending', 'Preparing', 'Ready', 'Completed'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: 'Invalid order status' });
+        }
+
+        const order = await Order.findOneAndUpdate(
+            { _id: orderId, vendorId },
+            { orderStatus: status },
+            { new: true }
+        );
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Emit Socket.io event to the customer's room (using order ID as room name for customers)
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`order_${order._id.toString()}`).emit('order_status_update', {
+                orderId: order._id,
+                orderStatus: status
+            });
+            // We can also emit a general update to the vendor room so other vendor dashboards sync
+            io.to(`vendor_${vendorId}`).emit('vendor_orders_refresh');
+        }
+
+        res.json({ success: true, order });
+
+    } catch (error) {
+        console.error('Update order status error:', error);
+        res.status(500).json({ error: 'Server error updating order status' });
     }
 };

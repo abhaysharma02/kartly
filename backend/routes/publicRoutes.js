@@ -19,4 +19,7 @@ router.post('/:vendorId/order', requireActiveSubscription, orderController.creat
 // 3. Razorpay Webhook (Sever-to-server)
 router.post('/webhook/razorpay', orderController.razorpayWebhook);
 
+// 4. Get order details for receipt
+router.get('/orders/:orderId', orderController.getOrderById);
+
 module.exports = router;
