@@ -8,6 +8,7 @@ const requireActiveSubscription = async (req, res, next) => {
             return res.status(400).json({ error: 'Vendor ID is required to check subscription.' });
         }
 
+        /*
         const activeSub = await Subscription.findOne({
             vendorId: vendorId,
             status: { $in: ['ACTIVE', 'TRIAL'] }
@@ -27,6 +28,7 @@ const requireActiveSubscription = async (req, res, next) => {
                 message: 'This vendor\'s subscription has expired.'
             });
         }
+        */
 
         next();
     } catch (error) {
