@@ -62,6 +62,16 @@ const Dashboard = () => {
         }
     }, [user]);
 
+    const handleUpdateOrderStatus = async (orderId, newStatus) => {
+        try {
+            const res = await api.put(`/vendor/orders/${orderId}/status`, { status: newStatus });
+            // Update local state to reflect the change immediately
+            setOrders(prev => prev.map(o => o._id === orderId ? { ...o, orderStatus: newStatus } : o));
+        } catch (err) {
+            setError('Failed to update order status');
+        }
+    };
+
     const handleCreateCategory = async (e) => {
         e.preventDefault();
         try {
@@ -204,9 +214,20 @@ const Dashboard = () => {
                                                             </ul>
                                                             <div className="flex justify-between items-center pt-3 border-t border-secondary-100">
                                                                 <p className="font-black text-lg text-secondary-900">₹{order.totalAmount}</p>
-                                                                <button className="bg-success-500 hover:bg-success-600 text-white px-4 py-1.5 rounded font-bold text-sm transition-colors shadow-sm">
-                                                                    Mark Ready
-                                                                </button>
+                                                                <select
+                                                                    value={order.orderStatus}
+                                                                    onChange={(e) => handleUpdateOrderStatus(order._id, e.target.value)}
+                                                                    className={`px-3 py-1.5 rounded font-bold text-sm shadow-sm border-none focus:ring-2 focus:ring-primary-500 cursor-pointer ${order.orderStatus === 'Pending' ? 'bg-warning-100 text-warning-800' :
+                                                                            order.orderStatus === 'Preparing' ? 'bg-primary-100 text-primary-800' :
+                                                                                order.orderStatus === 'Ready' ? 'bg-success-100 text-success-800' :
+                                                                                    'bg-secondary-200 text-secondary-800'
+                                                                        }`}
+                                                                >
+                                                                    <option value="Pending" className="bg-white text-secondary-900">Pending</option>
+                                                                    <option value="Preparing" className="bg-white text-secondary-900">Preparing</option>
+                                                                    <option value="Ready" className="bg-white text-secondary-900">Ready</option>
+                                                                    <option value="Completed" className="bg-white text-secondary-900">Completed</option>
+                                                                </select>
                                                             </div>
                                                         </div>
                                                     </div>

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 
 const CustomerMenu = () => {
     const { vendorId } = useParams();
+    const navigate = useNavigate();
 
     const [categories, setCategories] = useState([]);
     const [menuItems, setMenuItems] = useState([]);
@@ -14,8 +15,6 @@ const CustomerMenu = () => {
 
     // Checkout States
     const [isCheckingOut, setIsCheckingOut] = useState(false);
-    const [orderSuccess, setOrderSuccess] = useState(false);
-    const [tokenNumber, setTokenNumber] = useState(null);
 
     // Load Razorpay Script dynamically
     useEffect(() => {
@@ -114,9 +113,8 @@ const CustomerMenu = () => {
                 order_id: razorpayOrderId,
                 handler: function (response) {
                     // Frontend success - actual verification happens via backend webhook
-                    setOrderSuccess(true);
-                    setTokenNumber(generatedToken);
                     setCart([]); // Clear cart
+                    navigate(`/q/${vendorId}/receipt/${orderId}`);
                 },
                 prefill: {
                     name: "Customer",
@@ -156,29 +154,6 @@ const CustomerMenu = () => {
                     <svg className="w-16 h-16 text-danger-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                     <h2 className="text-2xl font-bold text-secondary-900 mb-2">Unavailable</h2>
                     <p className="text-secondary-600">{error}</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (orderSuccess) {
-        return (
-            <div className="min-h-screen bg-secondary-50 flex flex-col justify-center items-center p-4">
-                <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full text-center border-t-4 border-success-500 animate-fade-in-up">
-                    <div className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg className="w-10 h-10 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
-                    </div>
-                    <h2 className="text-3xl font-extrabold text-secondary-900 mb-2">Order Placed!</h2>
-                    <p className="text-secondary-600 mb-8">Your payment was successful and your order has been sent to the kitchen.</p>
-
-                    <div className="bg-secondary-50 p-6 rounded-xl border border-secondary-200 mb-8">
-                        <p className="text-sm font-medium text-secondary-500 uppercase tracking-wide mb-1">Your Token Number</p>
-                        <p className="text-6xl font-black text-primary-600">{tokenNumber}</p>
-                    </div>
-
-                    <button onClick={() => setOrderSuccess(false)} className="w-full bg-secondary-200 hover:bg-secondary-300 text-secondary-800 font-bold py-3 px-4 rounded-xl transition-colors">
-                        Order Something Else
-                    </button>
                 </div>
             </div>
         );

@@ -10,6 +10,7 @@ import VendorForgotPassword from './pages/vendor/ForgotPassword';
 import VendorResetPassword from './pages/vendor/ResetPassword';
 import VendorDashboard from './pages/vendor/Dashboard';
 import CustomerMenu from './pages/customer/CustomerMenu';
+import OrderReceipt from './pages/customer/OrderReceipt';
 
 // Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -39,6 +40,7 @@ const App = () => {
 
           {/* Customer Ordering App (No Auth Required) */}
           <Route path="/q/:vendorId" element={<CustomerMenu />} />
+          <Route path="/q/:vendorId/receipt/:orderId" element={<OrderReceipt />} />
 
           {/* Admin Routes (Simplified for now) */}
           <Route path="/admin/*" element={<AdminDashboard />} />
