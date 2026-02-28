@@ -137,7 +137,7 @@ const CustomerMenu = () => {
             if (err.response?.status === 403) {
                 setError('This vendor is not currently accepting orders (Subscription Expired).');
             } else {
-                setError('Failed to initiate checkout. Please try again later.');
+                setError(err.response?.data?.error || 'Failed to initiate checkout. Please try again later.');
             }
         } finally {
             setIsCheckingOut(false);
