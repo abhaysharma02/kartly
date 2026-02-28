@@ -104,9 +104,12 @@ const Dashboard = () => {
         try {
             setError(null);
             const res = await api.get('/vendor/qr');
-            setQrData(res.data.qrUrl);
+            // Dynamically construct the full URL so it works on any deployment domain
+            const fullUrl = `${window.location.origin}${res.data.qrPath}`;
+            setQrData(fullUrl);
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to generate QR Code');
+            console.error("QR Generation Failed:", err);
+            setError(err.response?.data?.error || 'Failed to generate QR Code. Make sure you have an active subscription, category, and menu item.');
         }
     };
 
@@ -218,9 +221,9 @@ const Dashboard = () => {
                                                                     value={order.orderStatus}
                                                                     onChange={(e) => handleUpdateOrderStatus(order._id, e.target.value)}
                                                                     className={`px-3 py-1.5 rounded font-bold text-sm shadow-sm border-none focus:ring-2 focus:ring-primary-500 cursor-pointer ${order.orderStatus === 'Pending' ? 'bg-warning-100 text-warning-800' :
-                                                                            order.orderStatus === 'Preparing' ? 'bg-primary-100 text-primary-800' :
-                                                                                order.orderStatus === 'Ready' ? 'bg-success-100 text-success-800' :
-                                                                                    'bg-secondary-200 text-secondary-800'
+                                                                        order.orderStatus === 'Preparing' ? 'bg-primary-100 text-primary-800' :
+                                                                            order.orderStatus === 'Ready' ? 'bg-success-100 text-success-800' :
+                                                                                'bg-secondary-200 text-secondary-800'
                                                                         }`}
                                                                 >
                                                                     <option value="Pending" className="bg-white text-secondary-900">Pending</option>
@@ -357,6 +360,12 @@ const Dashboard = () => {
                                             <p className="text-sm text-secondary-600 mb-8">
                                                 Print this QR code and place it on your cart. Customers can scan it to view your menu and order instantly.
                                             </p>
+
+                                            {error && activeTab === 'qr' && (
+                                                <div className="bg-danger-100 text-danger-800 p-3 rounded-lg mb-6 text-sm font-semibold border border-danger-200">
+                                                    {error}
+                                                </div>
+                                            )}
 
                                             {qrData ? (
                                                 <div className="flex flex-col items-center">
