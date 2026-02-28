@@ -7,21 +7,16 @@ const ForgotPassword = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [mockLink, setMockLink] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setMessage('');
-        setMockLink('');
         setIsLoading(true);
 
         try {
             const res = await api.post('/auth/forgot-password', { email });
             setMessage(res.data.message);
-            if (res.data.mockResetLink) {
-                setMockLink(res.data.mockResetLink);
-            }
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to send reset link.');
         } finally {
@@ -51,14 +46,6 @@ const ForgotPassword = () => {
                         {message && (
                             <div className="bg-success-50 border-l-4 border-success-500 p-4 mb-4">
                                 <p className="text-sm text-success-700 font-medium">{message}</p>
-                            </div>
-                        )}
-                        {mockLink && (
-                            <div className="bg-warning-50 border border-warning-200 p-4 mb-4 rounded">
-                                <p className="text-xs text-warning-700 font-bold mb-2">DEVELOPMENT MODE ONLY:</p>
-                                <a href={mockLink} className="text-sm text-primary-600 font-medium break-all hover:underline">
-                                    {mockLink}
-                                </a>
                             </div>
                         )}
 
