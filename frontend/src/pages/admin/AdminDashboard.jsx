@@ -3,7 +3,7 @@ import api from '../../utils/api';
 
 const AdminDashboard = () => {
     const [data, setData] = useState({ metrics: {}, subscriptions: [] });
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [adminSecret, setAdminSecret] = useState(localStorage.getItem('adminSecret') || '');
 
@@ -155,8 +155,8 @@ const AdminDashboard = () => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-md ${sub.status === 'ACTIVE' ? 'bg-success-100 text-success-800' :
-                                                        sub.status === 'TRIAL' ? 'bg-warning-100 text-warning-800' :
-                                                            'bg-danger-100 text-danger-800'
+                                                    sub.status === 'TRIAL' ? 'bg-warning-100 text-warning-800' :
+                                                        'bg-danger-100 text-danger-800'
                                                     }`}>
                                                     {sub.status}
                                                 </span>
@@ -171,8 +171,8 @@ const AdminDashboard = () => {
                                                 <button
                                                     onClick={() => handleToggleStatus(sub._id)} // Requires updating backend logic if sub._id isn't vendor._id mapping perfectly
                                                     className={`px-4 py-1.5 rounded font-bold text-xs uppercase tracking-wide transition-colors ${isAccountActive
-                                                            ? 'bg-danger-50 text-danger-700 hover:bg-danger-100 border border-danger-200'
-                                                            : 'bg-success-50 text-success-700 hover:bg-success-100 border border-success-200'
+                                                        ? 'bg-danger-50 text-danger-700 hover:bg-danger-100 border border-danger-200'
+                                                        : 'bg-success-50 text-success-700 hover:bg-success-100 border border-success-200'
                                                         }`}
                                                 >
                                                     {isAccountActive ? 'Suspend' : 'Activate'}
