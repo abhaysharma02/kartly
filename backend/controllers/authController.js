@@ -5,6 +5,7 @@ const Subscription = require('../models/Subscription');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const sendEmail = require('../utils/sendEmail');
 
 const register = async (req, res) => {
     try {
@@ -144,14 +145,32 @@ const forgotPassword = async (req, res) => {
         user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
         await user.save();
 
-        // In a real application, send an email here instead of returning it.
-        // For development/MVP testing purposes, we return the mock link to the UI.
-        const mockResetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/vendor/reset-password/${resetToken}`;
+        const resetUrl = `${process.env.FRONTEND_URL || 'https://kartly.in'}/vendor/reset-password/${resetToken}`;
 
-        res.json({
-            message: 'Password reset link generated. (Check UI for the link)',
-            mockResetLink
-        });
+        const message = `
+            <h2>Password Reset Request</h2>
+            <p>You have requested a password reset for your Kartly vendor account.</p>
+            <p>Please click the link below to set a new password. This link is valid for 1 hour.</p>
+            <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Reset Password</a>
+            <p style="margin-top: 20px; font-size: 12px; color: #666;">If you did not request this, please ignore this email.</p>
+        `;
+
+        try {
+            await sendEmail({
+                email: user.email,
+                subject: 'Kartly - Password Reset',
+                message
+            });
+
+            res.status(200).json({ success: true, message: 'Password reset email sent successfully.' });
+        } catch (emailError) {
+            console.error('Email send error:', emailError);
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpires = undefined;
+            await user.save();
+
+            return res.status(500).json({ error: 'Email could not be sent. Please check SMTP configuration.' });
+        }
 
     } catch (error) {
         console.error('FORGOT PASSWORD ERROR:', error);
