@@ -30,13 +30,14 @@ exports.generateQR = async (req, res) => {
         }
 
         // Passed all checks. 
-        // Usually, you might return the domain + vendorId so the frontend can draw it
-        const qrUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/q/${vendorId}`;
+        // Return just the routing path, let the frontend construct the full domain URL 
+        // to avoid mismatch between localhost, render, vercel, etc.
+        const qrPath = `/q/${vendorId}`;
 
         res.json({
             success: true,
-            qrUrl,
-            message: 'QR code URL generated successfully. Use frontend qrcode library to render.'
+            qrPath,
+            message: 'QR code path generated successfully. Use frontend window.location.origin to render.'
         });
 
     } catch (error) {
