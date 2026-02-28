@@ -15,6 +15,8 @@ const Dashboard = () => {
     const [menuItems, setMenuItems] = useState([]);
     const [qrData, setQrData] = useState(null);
     const [orders, setOrders] = useState([]); // Real-time orders
+    const [customers, setCustomers] = useState([]);
+    const [subscription, setSubscription] = useState(null);
 
     // UI States
     const [loading, setLoading] = useState(true);
@@ -27,12 +29,16 @@ const Dashboard = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [catsRes, itemsRes] = await Promise.all([
+            const [catsRes, itemsRes, custRes, subRes] = await Promise.all([
                 api.get('/vendor/categories'),
-                api.get('/vendor/menu-items')
+                api.get('/vendor/menu-items'),
+                api.get('/vendor/customers'),
+                api.get('/vendor/subscription')
             ]);
             setCategories(catsRes.data);
             setMenuItems(itemsRes.data);
+            setCustomers(custRes.data?.customers || []);
+            setSubscription(subRes.data?.subscription || null);
         } catch (err) {
             setError('Failed to fetch dashboard data');
         } finally {
@@ -113,6 +119,53 @@ const Dashboard = () => {
         }
     };
 
+    const loadRazorpayScript = () => {
+        return new Promise((resolve) => {
+            if (window.Razorpay) return resolve(true);
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+        });
+    };
+
+    const handleUpgradePlan = async () => {
+        try {
+            const isLoaded = await loadRazorpayScript();
+            if (!isLoaded) return setError('Failed to load Razorpay. Check your connection.');
+
+            setLoading(true);
+            const res = await api.post('/vendor/subscription/renew');
+            const { razorpayOrderId, amount, planInfo } = res.data;
+
+            const options = {
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_stub',
+                amount: amount,
+                currency: 'INR',
+                name: 'Kartly Premium Upgrade',
+                description: `Upgrade to ${planInfo.name} Plan for 30 Days`,
+                order_id: razorpayOrderId,
+                handler: function (response) {
+                    alert('Renewal processed! Razorpay Webhook will update your backend status shortly.');
+                    setTimeout(fetchData, 3000); // Give webhook time to hit
+                },
+                theme: { color: '#f59e0b' }
+            };
+
+            const rzp = new window.Razorpay(options);
+            rzp.on('payment.failed', function (response) {
+                alert('Payment failed. Please try again.');
+            });
+            rzp.open();
+        } catch (err) {
+            console.error('Upgrade failed:', err);
+            setError('Failed to initiate upgrade process.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-secondary-50">
             <nav className="bg-white shadow">
@@ -170,6 +223,18 @@ const Dashboard = () => {
                             className={`flex-1 py-4 text-sm font-medium text-center transition-colors ${activeTab === 'qr' ? 'bg-primary-50 text-primary-700 border-b-2 border-primary-500' : 'text-secondary-500 hover:text-secondary-700 hover:bg-secondary-50'}`}
                         >
                             QR Code
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('customers')}
+                            className={`flex-1 py-4 text-sm font-medium text-center transition-colors ${activeTab === 'customers' ? 'bg-primary-50 text-primary-700 border-b-2 border-primary-500' : 'text-secondary-500 hover:text-secondary-700 hover:bg-secondary-50'}`}
+                        >
+                            Customers (CRM)
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('billing')}
+                            className={`flex-1 py-4 text-sm font-medium text-center transition-colors ${activeTab === 'billing' ? 'bg-primary-50 text-primary-700 border-b-2 border-primary-500' : 'text-secondary-500 hover:text-secondary-700 hover:bg-secondary-50'}`}
+                        >
+                            Plan & Billing
                         </button>
                     </div>
 
@@ -388,6 +453,100 @@ const Dashboard = () => {
                                                 >
                                                     Generate QR Code
                                                 </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* CRM Customers Tab */}
+                                {activeTab === 'customers' && (
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center bg-secondary-50 p-4 rounded-lg border border-secondary-200">
+                                            <div>
+                                                <h3 className="font-bold text-secondary-900">Customer Marketing (CRM)</h3>
+                                                <p className="text-sm text-secondary-500 font-medium mt-1">Export customer details for personalized WhatsApp marketing.</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-3xl font-black text-primary-600">{customers.length}</div>
+                                                <div className="text-xs font-bold text-secondary-500 uppercase tracking-widest">Unique Customers</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white rounded-xl border border-secondary-200 shadow-sm overflow-hidden">
+                                            <table className="min-w-full divide-y divide-secondary-200">
+                                                <thead className="bg-secondary-50">
+                                                    <tr>
+                                                        <th className="px-6 py-4 text-left text-xs font-bold text-secondary-500 uppercase tracking-wider">Phone Number</th>
+                                                        <th className="px-6 py-4 text-center text-xs font-bold text-secondary-500 uppercase tracking-wider">Total Orders</th>
+                                                        <th className="px-6 py-4 text-center text-xs font-bold text-secondary-500 uppercase tracking-wider">Total Spent</th>
+                                                        <th className="px-6 py-4 text-left text-xs font-bold text-secondary-500 uppercase tracking-wider">Last Order</th>
+                                                        <th className="px-6 py-4 text-center text-xs font-bold text-secondary-500 uppercase tracking-wider">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-secondary-50">
+                                                    {customers.length === 0 ? (
+                                                        <tr><td colSpan="5" className="px-6 py-8 text-center text-secondary-500 italic">No customer data yet. Once customers provide their phones while ordering, they will appear here.</td></tr>
+                                                    ) : customers.map((c, idx) => (
+                                                        <tr key={idx} className="hover:bg-secondary-50 transition-colors">
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-secondary-900">{c._id}</td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-secondary-700 font-medium">{c.totalOrders}</td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-success-600 font-bold">₹{c.totalSpent}</td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500 font-medium">{new Date(c.lastOrderDate).toLocaleDateString()}</td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                                <a
+                                                                    href={`https://wa.me/91${c._id}?text=${encodeURIComponent("Hey there! It's been a while. Aaj kya khaoge? Mention this text for 10% off your next order!")}`}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="inline-flex items-center gap-1 bg-[#25D366] hover:bg-[#128C7E] text-white px-3 py-1.5 rounded font-bold text-xs transition-colors shadow-sm"
+                                                                >
+                                                                    WhatsApp Promo
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Billing & Plan Tab */}
+                                {activeTab === 'billing' && subscription && (
+                                    <div className="flex flex-col items-center justify-center py-6">
+                                        <div className="bg-white p-8 rounded-2xl border border-secondary-200 max-w-lg w-full shadow-sm text-center">
+                                            <h3 className="text-2xl font-black text-secondary-900 mb-2">Current Plan</h3>
+
+                                            <div className="mt-6 mb-8 inline-flex items-center justify-center p-6 bg-secondary-50 rounded-full border-4 border-primary-100">
+                                                <span className={`text-4xl font-black tracking-tight ${subscription.status === 'TRIAL' ? 'text-warning-500' : 'text-success-600'}`}>
+                                                    {subscription.planId?.name || 'TRIAL'}
+                                                </span>
+                                            </div>
+
+                                            <div className="space-y-4 text-left mb-8">
+                                                <div className="flex justify-between items-center py-2 border-b border-secondary-100">
+                                                    <span className="text-secondary-600 font-medium">Status</span>
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${subscription.status === 'ACTIVE' ? 'bg-success-100 text-success-800' : subscription.status === 'TRIAL' ? 'bg-warning-100 text-warning-800' : 'bg-danger-100 text-danger-800'}`}>
+                                                        {subscription.status}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center py-2 border-b border-secondary-100">
+                                                    <span className="text-secondary-600 font-medium">Valid Until</span>
+                                                    <span className="text-secondary-900 font-bold">{new Date(subscription.endDate).toLocaleDateString()} ({Math.max(0, Math.ceil((new Date(subscription.endDate) - new Date()) / (1000 * 60 * 60 * 24)))} Days Left)</span>
+                                                </div>
+                                                <div className="flex justify-between items-center py-2 border-b border-secondary-100">
+                                                    <span className="text-secondary-600 font-medium">Order Limit</span>
+                                                    <span className="text-secondary-900 font-bold">Unlimited</span>
+                                                </div>
+                                            </div>
+
+                                            {subscription.status === 'TRIAL' && (
+                                                <div className="bg-primary-50 p-4 rounded-xl border border-primary-200 mb-6 text-left">
+                                                    <h4 className="font-bold text-primary-800 mb-1">Scale your business</h4>
+                                                    <p className="text-primary-700 text-sm font-medium mb-3">Upgrade to Premium to get Priority Support, Analytics, and unlimited QR generations.</p>
+                                                    <button onClick={handleUpgradePlan} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors block text-center">
+                                                        Upgrade to Premium Plan (₹999/mo)
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>

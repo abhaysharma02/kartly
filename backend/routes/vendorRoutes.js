@@ -25,4 +25,11 @@ router.get('/qr', vendorController.generateQR);
 // Orders
 router.put('/orders/:orderId/status', vendorController.updateOrderStatus);
 
+// CRM (Customers)
+router.get('/customers', vendorController.getCustomers);
+
+// Billing & Subscriptions
+router.get('/subscription', vendorController.getSubscription);
+router.post('/subscription/renew', vendorController.renewSubscription);
+
 module.exports = router;

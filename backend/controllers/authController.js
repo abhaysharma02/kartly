@@ -47,7 +47,7 @@ const register = async (req, res) => {
             trialPlan = new Plan({
                 name: 'TRIAL',
                 price: 0,
-                durationDays: 7,
+                durationDays: 30, // 1 month free trial
                 orderLimit: 100,
                 features: { support: 'basic', qrcode: true }
             });
