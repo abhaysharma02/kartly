@@ -6,6 +6,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Pages
 import VendorLogin from './pages/vendor/Login';
 import VendorRegister from './pages/vendor/Register';
+import VendorForgotPassword from './pages/vendor/ForgotPassword';
+import VendorResetPassword from './pages/vendor/ResetPassword';
 import VendorDashboard from './pages/vendor/Dashboard';
 import CustomerMenu from './pages/customer/CustomerMenu';
 
@@ -17,9 +19,10 @@ const App = () => {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public Vendor Auth Routes */}
           <Route path="/vendor/login" element={<VendorLogin />} />
           <Route path="/vendor/register" element={<VendorRegister />} />
+          <Route path="/vendor/forgot-password" element={<VendorForgotPassword />} />
+          <Route path="/vendor/reset-password/:token" element={<VendorResetPassword />} />
 
           {/* Protected Vendor Routes */}
           <Route

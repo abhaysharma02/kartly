@@ -4,6 +4,7 @@ const Plan = require('../models/Plan');
 const Subscription = require('../models/Subscription');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const register = async (req, res) => {
     try {
@@ -126,4 +127,71 @@ const login = async (req, res) => {
     }
 };
 
-module.exports = { register, login };
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User with this email does not exist.' });
+        }
+
+        // Generate reset token
+        const resetToken = crypto.randomBytes(20).toString('hex');
+
+        // Save to user with 1-hour expiry
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+        await user.save();
+
+        // In a real application, send an email here instead of returning it.
+        // For development/MVP testing purposes, we return the mock link to the UI.
+        const mockResetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/vendor/reset-password/${resetToken}`;
+
+        res.json({
+            message: 'Password reset link generated. (Check UI for the link)',
+            mockResetLink
+        });
+
+    } catch (error) {
+        console.error('FORGOT PASSWORD ERROR:', error);
+        res.status(500).json({ error: 'Server error generating reset token' });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { newPassword } = req.body;
+
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ error: 'Password reset token is invalid or has expired.' });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(newPassword, salt);
+
+        // Update User
+        user.passwordHash = passwordHash;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
+
+        // Update matching Vendor (to keep passwords in sync)
+        await Vendor.findByIdAndUpdate(user.vendorId, { passwordHash });
+
+        res.json({ message: 'Password has been successfully reset. You can now log in.' });
+
+    } catch (error) {
+        console.error('RESET PASSWORD ERROR:', error);
+        res.status(500).json({ error: 'Server error resetting password' });
+    }
+};
+
+module.exports = { register, login, forgotPassword, resetPassword };

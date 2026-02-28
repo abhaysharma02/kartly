@@ -9,7 +9,9 @@ const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['OWNER', 'STAFF'], required: true }
+    role: { type: String, enum: ['OWNER', 'STAFF'], required: true },
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date }
 });
 
 userSchema.index({ vendorId: 1, email: 1 }, { unique: true });
