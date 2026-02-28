@@ -73,7 +73,7 @@ exports.createOrder = async (req, res) => {
 
     } catch (error) {
         console.error('Error creating order:', error);
-        res.status(500).json({ error: 'Failed to create order: ' + (error.message || error.description || JSON.stringify(error)) });
+        res.status(500).json({ error: 'Failed to create order: ' + (error.message || error.description || error.toString()), stack: error.stack });
     }
 };
 
