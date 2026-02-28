@@ -14,7 +14,7 @@ const razorpay = new Razorpay({
 exports.createOrder = async (req, res) => {
     try {
         const { vendorId } = req.params; // From the public URL /q/:vendorId/order
-        const { items, subtotal, taxAmount, totalAmount } = req.body;
+        const { items, subtotal, taxAmount, totalAmount, customerPhone } = req.body;
 
         // 1. Generate Token Number (Daily Reset System)
         // Get current date string in YYYY-MM-DD
@@ -31,6 +31,7 @@ exports.createOrder = async (req, res) => {
         const dbOrder = new Order({
             vendorId,
             tokenNumber,
+            customerPhone,
             items,
             subtotal,
             taxAmount,
