@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+// Handle Vercel env variable missing /api suffix
+let apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+if (apiUrl && !apiUrl.endsWith('/api') && apiUrl !== 'http://localhost:5000') {
+    apiUrl = apiUrl.replace(/\/$/, '') + '/api';
+}
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+    baseURL: apiUrl,
 });
 
 // Request interceptor to add JWT token
