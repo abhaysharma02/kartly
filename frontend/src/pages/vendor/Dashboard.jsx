@@ -182,10 +182,11 @@ const Dashboard = () => {
         { id: 'dashboard_home', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'orders', label: 'Live Orders', icon: ChefHat, badge: orders.filter(o => o.orderStatus === 'Pending').length },
         { id: 'menu', label: 'Menu Items', icon: UtensilsCrossed },
-        { id: 'categories', label: 'Categories', icon: ListMenu },
+        { id: 'categories', label: 'Categories', icon: ClipboardList },
         { id: 'qr', label: 'QR Code', icon: QrCode },
         { id: 'customers', label: 'Customers', icon: Users },
         { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
+        { id: 'settings', label: 'Settings', icon: Settings },
     ];
 
     return (
@@ -839,6 +840,17 @@ const Dashboard = () => {
                                                 </div>
                                             )}
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* Settings Tab */}
+                                {activeTab === 'settings' && (
+                                    <div className="bg-white rounded-2xl premium-shadow border border-secondary-100 overflow-hidden flex flex-col items-center justify-center p-16 text-center">
+                                        <div className="w-20 h-20 bg-secondary-50 rounded-full flex items-center justify-center mb-6">
+                                            <Settings className="w-10 h-10 text-secondary-400 animate-spin-slow" />
+                                        </div>
+                                        <h3 className="text-2xl font-black text-secondary-900 mb-2">Settings Coming Soon</h3>
+                                        <p className="text-secondary-500 font-medium max-w-sm">We are currently building the advanced store settings interface. Check back soon for updates!</p>
                                     </div>
                                 )}
                             </div>
