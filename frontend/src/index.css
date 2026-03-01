@@ -1,19 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
+  --color-primary-50: #fff7ed;
+  --color-primary-100: #ffedd5;
+  --color-primary-500: #f97316;
+  --color-primary-600: #ea580c;
+  --color-primary-700: #c2410c;
 
   --color-secondary-50: #f8fafc;
   --color-secondary-100: #f1f5f9;
+  --color-secondary-200: #e2e8f0;
   --color-secondary-800: #1e293b;
   --color-secondary-900: #0f172a;
-  
+
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
   --color-success-500: #10b981;
+  --color-success-600: #059669;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
   --color-danger-500: #ef4444;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
   --color-warning-500: #f59e0b;
 }
 
@@ -21,4 +31,41 @@ body {
   background-color: var(--color-secondary-50);
   color: var(--color-secondary-900);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Utilities for Premium Look */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.premium-shadow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.premium-shadow-hover:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Customer App Specific Styles */
+.mobile-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #f8fafc;
+  position: relative;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
