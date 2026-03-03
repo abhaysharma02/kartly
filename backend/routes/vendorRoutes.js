@@ -4,6 +4,7 @@ const { isolateTenant } = require('../middleware/auth');
 const categoryController = require('../controllers/categoryController');
 const menuController = require('../controllers/menuController');
 const vendorController = require('../controllers/vendorController');
+const inventoryController = require('../controllers/inventoryController');
 
 // All vendor dashboard routes require authentication
 router.use(isolateTenant);
@@ -31,5 +32,11 @@ router.get('/customers', vendorController.getCustomers);
 // Billing & Subscriptions
 router.get('/subscription', vendorController.getSubscription);
 router.post('/subscription/renew', vendorController.renewSubscription);
+
+// Inventory
+router.get('/inventory', inventoryController.getInventoryItems);
+router.post('/inventory', inventoryController.createInventoryItem);
+router.put('/inventory/:id', inventoryController.updateInventoryItem);
+router.delete('/inventory/:id', inventoryController.deleteInventoryItem);
 
 module.exports = router;

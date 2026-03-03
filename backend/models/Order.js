@@ -35,7 +35,9 @@ const orderSchema = new mongoose.Schema({
         type: String,
         enum: ['Pending', 'Preparing', 'Ready', 'Completed'],
         default: 'Pending'
-    }
+    },
+    acknowledged: { type: Boolean, default: false },
+    failedTimeout: { type: Boolean, default: false }
 }, { timestamps: true });
 
 orderSchema.index({ createdAt: 1 });

@@ -58,7 +58,7 @@ exports.updateOrderStatus = async (req, res) => {
         const { orderId } = req.params;
         const { status } = req.body;
 
-        const validStatuses = ['Pending', 'Preparing', 'Ready', 'Completed'];
+        const validStatuses = ['Pending', 'Preparing', 'Ready', 'Completed', 'Cancelled'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ error: 'Invalid order status' });
         }
@@ -71,6 +71,17 @@ exports.updateOrderStatus = async (req, res) => {
 
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Trigger Business Logic: Revert Stock on Cancellation
+        if (status === 'Cancelled') {
+            try {
+                const { revertStock } = require('./inventoryController');
+                await revertStock(vendorId, order.items);
+                console.log(`[Inventory] Reverted stock for cancelled Order ${order._id}`);
+            } catch (inventoryErr) {
+                console.error('[Inventory Error] Failed to revert stock:', inventoryErr);
+            }
         }
 
         // Emit Socket.io event to the customer's room (using order ID as room name for customers)

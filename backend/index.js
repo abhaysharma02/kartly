@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -18,7 +19,9 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || '*',
+        origin: process.env.NODE_ENV === 'production'
+            ? ['https://kartly.nestely.in', 'https://pos.nestely.in']
+            : '*',
         methods: ['GET', 'POST', 'PUT', 'DELETE'],
     },
 });
@@ -28,12 +31,21 @@ app.set('io', io);
 
 // Middleware
 app.use(helmet());
-app.use(cors());
-// IMPORTANT: Stripe/Razorpay webhooks often need raw body. 
-// If using crypto.createHmac with JSON.stringify, ensure strict ordering or use express.raw for that route specifically.
-// For simplicity in this base stub, we use express.json globally.
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production'
+        ? ['https://kartly.nestely.in', 'https://pos.nestely.in']
+        : '*'
+}));
 app.use(express.json());
 app.use(morgan('dev'));
+
+// Rate Limiting
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: 'Too many requests, please try again later.' }
+});
+app.use('/api', apiLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -73,6 +85,18 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
+    });
+
+    socket.on('ORDER_ACK', async (data) => {
+        if (data && data.orderId) {
+            console.log(`[Socket] Kitchen Acknowledged Order: ${data.orderId}`);
+            try {
+                const Order = require('./models/Order');
+                await Order.findByIdAndUpdate(data.orderId, { acknowledged: true });
+            } catch (err) {
+                console.error('[Socket] Failed to process ORDER_ACK', err);
+            }
+        }
     });
 });
 

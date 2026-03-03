@@ -17,7 +17,9 @@ import {
     Bell,
     ChefHat,
     TrendingUp,
-    Store
+    Store,
+    PackageOpen,
+    Trash2
 } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
@@ -34,6 +36,7 @@ const Dashboard = () => {
     const [orders, setOrders] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [subscription, setSubscription] = useState(null);
+    const [inventoryItems, setInventoryItems] = useState([]);
 
     // UI States
     const [loading, setLoading] = useState(true);
@@ -42,20 +45,24 @@ const Dashboard = () => {
     // Form States
     const [newCatName, setNewCatName] = useState('');
     const [newItem, setNewItem] = useState({ name: '', description: '', price: '', categoryId: '', imageUrl: '' });
+    const [newInventoryItem, setNewInventoryItem] = useState({ itemName: '', quantity: '', unit: 'kg', unitPrice: '' });
+    const [customPromoMessage, setCustomPromoMessage] = useState("Hey there! It's been a while. Aaj kya khaoge? Here's an exclusive 10% off your next visit. Order now!");
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [catsRes, itemsRes, custRes, subRes] = await Promise.all([
+            const [catsRes, itemsRes, custRes, subRes, invRes] = await Promise.all([
                 api.get('/vendor/categories'),
                 api.get('/vendor/menu-items'),
                 api.get('/vendor/customers'),
-                api.get('/vendor/subscription')
+                api.get('/vendor/subscription'),
+                api.get('/vendor/inventory')
             ]);
             setCategories(catsRes.data);
             setMenuItems(itemsRes.data);
             setCustomers(custRes.data?.customers || []);
             setSubscription(subRes.data?.subscription || null);
+            setInventoryItems(invRes.data || []);
         } catch (err) {
             setError('Failed to fetch dashboard data');
         } finally {
@@ -116,6 +123,27 @@ const Dashboard = () => {
             fetchData();
         } catch (err) {
             setError('Failed to create menu item');
+        }
+    };
+
+    const handleCreateInventory = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post('/vendor/inventory', newInventoryItem);
+            setNewInventoryItem({ itemName: '', quantity: '', unit: 'kg', unitPrice: '' });
+            fetchData();
+        } catch (err) {
+            setError('Failed to add inventory item');
+        }
+    };
+
+    const handleDeleteInventory = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this item?')) return;
+        try {
+            await api.delete(`/vendor/inventory/${id}`);
+            fetchData();
+        } catch (err) {
+            setError('Failed to delete inventory item');
         }
     };
 
@@ -183,6 +211,7 @@ const Dashboard = () => {
         { id: 'orders', label: 'Live Orders', icon: ChefHat, badge: orders.filter(o => o.orderStatus === 'Pending').length },
         { id: 'menu', label: 'Menu Items', icon: UtensilsCrossed },
         { id: 'categories', label: 'Categories', icon: ClipboardList },
+        { id: 'inventory', label: 'Inventory', icon: PackageOpen },
         { id: 'qr', label: 'QR Code', icon: QrCode },
         { id: 'customers', label: 'Customers', icon: Users },
         { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
@@ -760,6 +789,18 @@ const Dashboard = () => {
                                             </div>
                                         </div>
 
+                                        <div className="bg-white p-6 rounded-2xl border border-secondary-100 premium-shadow mb-6">
+                                            <h4 className="text-sm font-bold text-secondary-900 mb-2">Custom Broadcast Message</h4>
+                                            <p className="text-xs text-secondary-500 mb-4">Set the default message that will open when you click 'Send Promo' for any customer below.</p>
+                                            <textarea
+                                                value={customPromoMessage}
+                                                onChange={(e) => setCustomPromoMessage(e.target.value)}
+                                                rows="3"
+                                                className="w-full px-4 py-3 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm resize-none"
+                                                placeholder="Write your exciting offer here..."
+                                            ></textarea>
+                                        </div>
+
                                         <div className="bg-white rounded-2xl border border-secondary-100 premium-shadow overflow-hidden">
                                             <table className="min-w-full divide-y divide-secondary-100">
                                                 <thead className="bg-secondary-50/80">
@@ -782,7 +823,7 @@ const Dashboard = () => {
                                                             <td className="px-6 py-5 whitespace-nowrap text-sm text-secondary-500 font-medium">{new Date(c.lastOrderDate).toLocaleDateString()}</td>
                                                             <td className="px-6 py-5 whitespace-nowrap text-center">
                                                                 <a
-                                                                    href={`https://wa.me/91${c._id}?text=${encodeURIComponent("Hey there! It's been a while. Aaj kya khaoge? Mention this text for 10% off your next order!")}`}
+                                                                    href={`https://wa.me/91${c._id}?text=${encodeURIComponent(customPromoMessage)}`}
                                                                     target="_blank"
                                                                     rel="noreferrer"
                                                                     className="inline-flex items-center gap-2 bg-[#25D366]/10 hover:bg-[#25D366] text-[#128C7E] hover:text-white px-4 py-2 rounded-xl font-bold text-xs transition-all opacity-80 group-hover:opacity-100"
@@ -830,15 +871,157 @@ const Dashboard = () => {
                                                 </div>
                                             </div>
 
-                                            {subscription.status === 'TRIAL' && (
-                                                <div className="bg-gradient-to-br from-primary-50 to-white p-6 rounded-2xl border border-primary-100 mb-2 text-left relative z-10 shadow-inner">
-                                                    <h4 className="font-black text-primary-900 mb-2 truncate text-xl">Go Commercial ✨</h4>
-                                                    <p className="text-primary-700 text-sm font-medium mb-6">Upgrade to Premium to unlock Priority Support, Analytics, and unlimited QR generations forever.</p>
-                                                    <button onClick={handleUpgradePlan} className="w-full bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-black py-4 rounded-xl shadow-lg shadow-primary-500/30 transition-transform hover:-translate-y-0.5">
-                                                        Upgrade for ₹999/mo
-                                                    </button>
+                                            <div className="bg-gradient-to-br from-primary-50 to-white p-6 rounded-2xl border border-primary-100 mb-2 text-left relative z-10 shadow-inner">
+                                                <h4 className="font-black text-primary-900 mb-2 truncate text-xl">
+                                                    {subscription.status === 'TRIAL' ? 'Go Commercial ✨' : subscription.status === 'ACTIVE' ? 'Renew Plan ✨' : 'Reactivate Plan ✨'}
+                                                </h4>
+                                                <p className="text-primary-700 text-sm font-medium mb-6">
+                                                    {subscription.status === 'TRIAL'
+                                                        ? 'Upgrade to Premium to unlock Priority Support, Analytics, and unlimited QR generations forever.'
+                                                        : 'Secure another 30 days of seamless operations, priority support, and unlimited QR usage!'}
+                                                </p>
+                                                <button onClick={handleUpgradePlan} className="w-full bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-black py-4 rounded-xl shadow-lg shadow-primary-500/30 transition-transform hover:-translate-y-0.5">
+                                                    {subscription.status === 'TRIAL' ? 'Upgrade for ₹999/mo' : 'Renew for ₹999/mo'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Inventory Tab */}
+                                {activeTab === 'inventory' && (
+                                    <div className="space-y-6">
+                                        <div className="flex flex-col md:flex-row gap-6">
+                                            {/* Add Inventory Form */}
+                                            <div className="w-full md:w-1/3">
+                                                <div className="bg-white p-6 rounded-2xl premium-shadow border border-secondary-100">
+                                                    <h3 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
+                                                        <PackageOpen className="w-5 h-5 text-primary-600" />
+                                                        Add New Stock
+                                                    </h3>
+                                                    <form onSubmit={handleCreateInventory} className="space-y-4">
+                                                        <div>
+                                                            <label className="block text-sm font-bold text-secondary-700 mb-1">Item Name</label>
+                                                            <input
+                                                                type="text"
+                                                                required
+                                                                value={newInventoryItem.itemName}
+                                                                onChange={(e) => setNewInventoryItem({ ...newInventoryItem, itemName: e.target.value })}
+                                                                className="w-full px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm"
+                                                                placeholder="e.g. Tomatoes"
+                                                            />
+                                                        </div>
+                                                        <div className="flex gap-4">
+                                                            <div className="flex-1">
+                                                                <label className="block text-sm font-bold text-secondary-700 mb-1">Quantity</label>
+                                                                <input
+                                                                    type="number"
+                                                                    required
+                                                                    min="0"
+                                                                    step="0.1"
+                                                                    value={newInventoryItem.quantity}
+                                                                    onChange={(e) => setNewInventoryItem({ ...newInventoryItem, quantity: e.target.value })}
+                                                                    className="w-full px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm"
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <label className="block text-sm font-bold text-secondary-700 mb-1">Unit</label>
+                                                                <select
+                                                                    value={newInventoryItem.unit}
+                                                                    onChange={(e) => setNewInventoryItem({ ...newInventoryItem, unit: e.target.value })}
+                                                                    className="w-full px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm"
+                                                                >
+                                                                    <option value="kg">KG</option>
+                                                                    <option value="liters">Liters</option>
+                                                                    <option value="pieces">Pieces</option>
+                                                                    <option value="packets">Packets</option>
+                                                                    <option value="grams">Grams</option>
+                                                                    <option value="other">Other</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-bold text-secondary-700 mb-1">Unit Price (₹)</label>
+                                                            <input
+                                                                type="number"
+                                                                required
+                                                                min="0"
+                                                                value={newInventoryItem.unitPrice}
+                                                                onChange={(e) => setNewInventoryItem({ ...newInventoryItem, unitPrice: e.target.value })}
+                                                                className="w-full px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm"
+                                                                placeholder="Price per unit"
+                                                            />
+                                                        </div>
+                                                        <button type="submit" className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-primary-500/30 flex justify-center items-center gap-2">
+                                                            <PackageOpen className="w-4 h-4" /> Add Item
+                                                        </button>
+                                                    </form>
                                                 </div>
-                                            )}
+                                            </div>
+
+                                            {/* Inventory List */}
+                                            <div className="w-full md:w-2/3">
+                                                <div className="bg-white rounded-2xl premium-shadow border border-secondary-100 overflow-hidden flex flex-col h-full">
+                                                    <div className="p-6 border-b border-secondary-100 flex justify-between items-center bg-secondary-50/50">
+                                                        <div>
+                                                            <h3 className="text-lg font-bold text-secondary-900">Current Stock</h3>
+                                                            <p className="text-sm text-secondary-500 font-medium">Manage your kitchen inventory and track costs.</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-xs font-bold text-secondary-500 uppercase tracking-widest">Total Inventory Value</p>
+                                                            <p className="text-2xl font-black text-primary-600">
+                                                                ₹{inventoryItems.reduce((acc, item) => acc + (item.totalValue || 0), 0).toLocaleString()}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="p-0 overflow-x-auto flex-1">
+                                                        <table className="w-full text-left border-collapse">
+                                                            <thead>
+                                                                <tr className="bg-secondary-50 border-b border-secondary-200 text-xs uppercase tracking-wider text-secondary-500 font-bold">
+                                                                    <th className="p-4 pl-6">Item</th>
+                                                                    <th className="p-4">Quantity</th>
+                                                                    <th className="p-4">Unit Price</th>
+                                                                    <th className="p-4">Total Value</th>
+                                                                    <th className="p-4 pr-6 text-right">Actions</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-secondary-100">
+                                                                {inventoryItems.length === 0 ? (
+                                                                    <tr>
+                                                                        <td colSpan="5" className="p-8 text-center text-secondary-500 font-medium">
+                                                                            No inventory items added yet. Start adding stock to track your kitchen!
+                                                                        </td>
+                                                                    </tr>
+                                                                ) : (
+                                                                    inventoryItems.map((item) => (
+                                                                        <tr key={item._id} className="hover:bg-secondary-50/50 transition-colors">
+                                                                            <td className="p-4 pl-6 font-bold text-secondary-900">{item.itemName}</td>
+                                                                            <td className="p-4">
+                                                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-bold ${item.quantity <= item.lowStockThreshold ? 'bg-danger-100 text-danger-700' : 'bg-secondary-100 text-secondary-700'}`}>
+                                                                                    {item.quantity} {item.unit}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="p-4 text-secondary-600 font-medium">₹{item.unitPrice}</td>
+                                                                            <td className="p-4 font-bold text-secondary-900">₹{item.totalValue}</td>
+                                                                            <td className="p-4 pr-6 text-right">
+                                                                                <button
+                                                                                    onClick={() => handleDeleteInventory(item._id)}
+                                                                                    className="p-2 text-danger-400 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
+                                                                                    title="Delete Item"
+                                                                                >
+                                                                                    <Trash2 className="w-4 h-4" />
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}

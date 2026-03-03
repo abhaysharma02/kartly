@@ -4,6 +4,7 @@ const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const TokenTracker = require('../models/TokenTracker');
 const Vendor = require('../models/Vendor');
+const MenuItem = require('../models/MenuItem');
 // Note: io is imported dynamically in index.js, we will pass it via req.app.get('io')
 
 const razorpay = new Razorpay({
@@ -14,7 +15,37 @@ const razorpay = new Razorpay({
 exports.createOrder = async (req, res) => {
     try {
         const { vendorId } = req.params; // From the public URL /q/:vendorId/order
-        const { items, subtotal, taxAmount, totalAmount, customerPhone } = req.body;
+        const { items, customerPhone } = req.body;
+
+        if (!items || items.length === 0) {
+            return res.status(400).json({ error: 'Cart is empty' });
+        }
+
+        // 0. Server-Side Cart Validation (SECURITY)
+        let calculatedSubtotal = 0;
+        const verifiedItems = [];
+
+        for (const item of items) {
+            const menuItem = await MenuItem.findOne({ _id: item.menuItemId, vendorId, isAvailable: true });
+            if (!menuItem) {
+                return res.status(400).json({ error: `Item ${item.name || 'unknown'} is currently unavailable or invalid.` });
+            }
+
+            const unitPrice = menuItem.price;
+            const totalPrice = unitPrice * item.quantity;
+            calculatedSubtotal += totalPrice;
+
+            verifiedItems.push({
+                menuItemId: menuItem._id,
+                name: menuItem.name,
+                quantity: item.quantity,
+                unitPrice: unitPrice,
+                totalPrice: totalPrice
+            });
+        }
+
+        const calculatedTax = calculatedSubtotal * 0.05; // Fixed 5% GST for MVP
+        const calculatedTotal = calculatedSubtotal + calculatedTax;
 
         // 1. Generate Token Number (Daily Reset System)
         // Get current date string in YYYY-MM-DD
@@ -32,10 +63,10 @@ exports.createOrder = async (req, res) => {
             vendorId,
             tokenNumber,
             customerPhone,
-            items,
-            subtotal,
-            taxAmount,
-            totalAmount,
+            items: verifiedItems,
+            subtotal: calculatedSubtotal,
+            taxAmount: calculatedTax,
+            totalAmount: calculatedTotal,
             paymentStatus: 'INITIATED',
             orderStatus: 'Pending'
         });
@@ -45,7 +76,7 @@ exports.createOrder = async (req, res) => {
         // 3. Create Razorpay Order
         // Total amount in paise (multiply by 100)
         const rpOptions = {
-            amount: Math.round(totalAmount * 100),
+            amount: Math.round(calculatedTotal * 100),
             currency: "INR",
             receipt: dbOrder._id.toString()
         };
@@ -57,7 +88,7 @@ exports.createOrder = async (req, res) => {
             vendorId,
             orderId: dbOrder._id,
             razorpayOrderId: rpOrder.id,
-            amount: totalAmount,
+            amount: calculatedTotal,
             status: 'CREATED'
         });
 
@@ -115,10 +146,21 @@ exports.razorpayWebhook = async (req, res) => {
                     { new: true }
                 );
 
-                // Emit Socket.io event to the vendor's room
-                const io = req.app.get('io');
-                if (io && orderRecord) {
-                    io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
+                if (orderRecord) {
+                    // 1. Emit Socket.io event to the vendor's room
+                    const io = req.app.get('io');
+                    if (io) {
+                        io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
+                    }
+
+                    // 2. Trigger Business Logic: Deduct Stock
+                    try {
+                        const { deductStock } = require('./inventoryController');
+                        await deductStock(orderRecord.vendorId, orderRecord.items);
+                        console.log(`[Inventory] Deducted stock for Order ${orderRecord._id}`);
+                    } catch (inventoryErr) {
+                        console.error('[Inventory Error] Failed to deduct stock:', inventoryErr);
+                    }
                 }
             }
         } else if (event === 'payment.failed') {
