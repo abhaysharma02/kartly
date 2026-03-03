@@ -140,26 +140,38 @@ exports.razorpayWebhook = async (req, res) => {
             );
 
             if (paymentRecord) {
-                const orderRecord = await Order.findOneAndUpdate(
-                    { _id: paymentRecord.orderId },
-                    { paymentStatus: 'SUCCESS' },
-                    { new: true }
-                );
+                // If it's a food order payment
+                if (paymentRecord.orderId) {
+                    const orderRecord = await Order.findOneAndUpdate(
+                        { _id: paymentRecord.orderId },
+                        { paymentStatus: 'SUCCESS' },
+                        { new: true }
+                    );
 
-                if (orderRecord) {
-                    // 1. Emit Socket.io event to the vendor's room
-                    const io = req.app.get('io');
-                    if (io) {
-                        io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
+                    if (orderRecord) {
+                        const io = req.app.get('io');
+                        if (io) {
+                            io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
+                        }
+                        try {
+                            const { deductStock } = require('./inventoryController');
+                            await deductStock(orderRecord.vendorId, orderRecord.items);
+                        } catch (inventoryErr) {
+                            console.error('[Inventory]', inventoryErr);
+                        }
                     }
-
-                    // 2. Trigger Business Logic: Deduct Stock
-                    try {
-                        const { deductStock } = require('./inventoryController');
-                        await deductStock(orderRecord.vendorId, orderRecord.items);
-                        console.log(`[Inventory] Deducted stock for Order ${orderRecord._id}`);
-                    } catch (inventoryErr) {
-                        console.error('[Inventory Error] Failed to deduct stock:', inventoryErr);
+                } else {
+                    // It's a Subscription Payment (no orderId attached)
+                    const subRecord = await Subscription.findOne({ vendorId: paymentRecord.vendorId });
+                    if (subRecord) {
+                        subRecord.status = 'ACTIVE';
+                        // Add 30 days to expiry
+                        const currentEnd = new Date(Math.max(new Date(), new Date(subRecord.endDate)));
+                        currentEnd.setDate(currentEnd.getDate() + 30);
+                        subRecord.endDate = currentEnd;
+                        subRecord.paymentReference = rpPaymentId;
+                        await subRecord.save();
+                        console.log(`[Subscription Activated] Vendor: ${paymentRecord.vendorId}`);
                     }
                 }
             }

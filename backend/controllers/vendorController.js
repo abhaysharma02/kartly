@@ -128,6 +128,30 @@ exports.getCustomers = async (req, res) => {
     }
 };
 
+exports.getOrders = async (req, res) => {
+    try {
+        const vendorId = req.vendorId;
+        // Fetch orders that are not Completed or Cancelled yet (i.e., active queue)
+        // Or fetch today's orders. For standard dashboard, let's fetch active + today's history
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const orders = await Order.find({
+            vendorId,
+            paymentStatus: 'SUCCESS',
+            $or: [
+                { orderStatus: { $in: ['Pending', 'Preparing', 'Ready'] } },
+                { createdAt: { $gte: startOfDay } }
+            ]
+        }).sort({ createdAt: -1 });
+
+        res.json({ success: true, orders });
+    } catch (error) {
+        console.error('Fetch orders error:', error);
+        res.status(500).json({ error: 'Server error fetching orders' });
+    }
+};
+
 exports.getSubscription = async (req, res) => {
     try {
         const vendorId = req.vendorId;
@@ -162,6 +186,15 @@ exports.renewSubscription = async (req, res) => {
         };
 
         const rpOrder = await razorpay.orders.create(rpOptions);
+
+        // CREATE PAYMENT RECORD FOR WEBHOOK TO FIND (No orderId needed)
+        const Payment = require('../models/Payment');
+        await Payment.create({
+            vendorId,
+            razorpayOrderId: rpOrder.id,
+            amount: premiumPlan.price,
+            status: 'CREATED'
+        });
 
         res.json({
             success: true,

@@ -137,6 +137,11 @@ const CustomerMenu = () => {
                 order_id: razorpayOrderId,
                 handler: function () {
                     setCart([]);
+
+                    // Option A (Token Recovery): Store the last successful order
+                    const recoveryData = { vendorId, orderId, time: new Date().getTime() };
+                    localStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
+
                     navigate(`/q/${vendorId}/receipt/${orderId}`);
                 },
                 prefill: {

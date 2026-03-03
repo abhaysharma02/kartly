@@ -9,8 +9,7 @@ const paymentSchema = new mongoose.Schema({
     },
     orderId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Order',
-        required: true
+        ref: 'Order'
     },
     razorpayOrderId: { type: String, index: true },
     razorpayPaymentId: { type: String },

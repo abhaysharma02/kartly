@@ -24,6 +24,7 @@ router.put('/menu-items/:id', menuController.updateMenuItem);
 router.get('/qr', vendorController.generateQR);
 
 // Orders
+router.get('/orders', vendorController.getOrders);
 router.put('/orders/:orderId/status', vendorController.updateOrderStatus);
 
 // CRM (Customers)
