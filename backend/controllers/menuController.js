@@ -2,7 +2,7 @@ const MenuItem = require('../models/MenuItem');
 
 exports.createMenuItem = async (req, res) => {
     try {
-        const { categoryId, name, description, price, imageUrl } = req.body;
+        const { categoryId, name, description, price, imageUrl, inventoryItemId } = req.body;
         const vendorId = req.vendorId;
 
         const item = new MenuItem({
@@ -11,7 +11,8 @@ exports.createMenuItem = async (req, res) => {
             name,
             description,
             price,
-            imageUrl
+            imageUrl,
+            inventoryItemId
         });
 
         await item.save();
@@ -39,12 +40,12 @@ exports.getMenuItems = async (req, res) => {
 exports.updateMenuItem = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, price, imageUrl, isAvailable, categoryId } = req.body;
+        const { name, description, price, imageUrl, isAvailable, categoryId, inventoryItemId } = req.body;
         const vendorId = req.vendorId;
 
         const item = await MenuItem.findOneAndUpdate(
             { _id: id, vendorId }, // Multi-tenant scoping
-            { name, description, price, imageUrl, isAvailable, categoryId },
+            { name, description, price, imageUrl, isAvailable, categoryId, inventoryItemId },
             { new: true }
         );
 

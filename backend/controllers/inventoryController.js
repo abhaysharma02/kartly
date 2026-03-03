@@ -87,8 +87,13 @@ const deleteInventoryItem = async (req, res) => {
 const deductStock = async (vendorId, items) => {
     try {
         for (const item of items) {
-            // Find inventory item by exact name match for MVP simple correlation
-            const inventoryItem = await InventoryItem.findOne({ vendorId: vendorId, itemName: item.name });
+            if (!item.inventoryItemId) continue; // Skip items that aren't mapped to inventory
+
+            const inventoryItem = await InventoryItem.findOne({
+                vendorId: vendorId,
+                _id: item.inventoryItemId
+            });
+
             if (inventoryItem) {
                 // Deduct quantity
                 const newQuantity = Math.max(0, inventoryItem.quantity - item.quantity);
@@ -105,7 +110,13 @@ const deductStock = async (vendorId, items) => {
 const revertStock = async (vendorId, items) => {
     try {
         for (const item of items) {
-            const inventoryItem = await InventoryItem.findOne({ vendorId: vendorId, itemName: item.name });
+            if (!item.inventoryItemId) continue;
+
+            const inventoryItem = await InventoryItem.findOne({
+                vendorId: vendorId,
+                _id: item.inventoryItemId
+            });
+
             if (inventoryItem) {
                 inventoryItem.quantity = inventoryItem.quantity + item.quantity;
                 await inventoryItem.save();

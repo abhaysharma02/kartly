@@ -40,7 +40,8 @@ exports.createOrder = async (req, res) => {
                 name: menuItem.name,
                 quantity: item.quantity,
                 unitPrice: unitPrice,
-                totalPrice: totalPrice
+                totalPrice: totalPrice,
+                inventoryItemId: menuItem.inventoryItemId
             });
         }
 
@@ -132,12 +133,17 @@ exports.razorpayWebhook = async (req, res) => {
             const rpOrderId = paymentEntity.order_id;
             const rpPaymentId = paymentEntity.id;
 
-            // Find the corresponding Payment and Order
+            // Find the corresponding Payment and update ONLY if not already SUCCESS
             const paymentRecord = await Payment.findOneAndUpdate(
-                { razorpayOrderId: rpOrderId },
+                { razorpayOrderId: rpOrderId, status: { $ne: 'SUCCESS' } },
                 { status: 'SUCCESS', razorpayPaymentId: rpPaymentId },
                 { new: true }
             );
+
+            // If paymentRecord is null, it means it was already processed or doesn't exist.
+            if (!paymentRecord) {
+                return res.json({ status: 'ok', msg: 'Webhook duplicate ignored or payment not found' });
+            }
 
             if (paymentRecord) {
                 // If it's a food order payment

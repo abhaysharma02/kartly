@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X } from 'lucide-react';
+import { ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt } from 'lucide-react';
 
 const CustomerMenu = () => {
     const { vendorId } = useParams();
@@ -22,6 +22,7 @@ const CustomerMenu = () => {
     const [customerPhone, setCustomerPhone] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [activeCategory, setActiveCategory] = useState('');
+    const [recoveryLink, setRecoveryLink] = useState(null);
 
     const categoryRefs = useRef({});
 
@@ -60,6 +61,18 @@ const CustomerMenu = () => {
         };
 
         fetchMenu();
+
+        // Option A (Token Recovery): Check localStorage
+        try {
+            const data = localStorage.getItem(`kartly_last_order_${vendorId}`);
+            if (data) {
+                const parsed = JSON.parse(data);
+                // Simple 1-hour expiry on local recovery link just so it goes away eventually 
+                if (new Date().getTime() - parsed.time < 3600000) {
+                    setRecoveryLink(`/q/${vendorId}/receipt/${parsed.orderId}`);
+                }
+            }
+        } catch (e) { /* ignore */ }
     }, [vendorId]);
 
     const addToCart = (item) => {
@@ -310,6 +323,26 @@ const CustomerMenu = () => {
                         />
                     </div>
                 </div>
+
+                {/* Token Recovery Banner */}
+                {recoveryLink && (
+                    <div className="max-w-2xl mx-auto px-4 mt-4 animate-fade-in-up">
+                        <div className="bg-primary-50 border border-primary-200 rounded-2xl p-4 flex justify-between items-center premium-shadow">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
+                                    <Receipt className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-secondary-900 text-sm">Active Order</h3>
+                                    <p className="text-secondary-500 text-xs font-medium">View your live order status</p>
+                                </div>
+                            </div>
+                            <button onClick={() => navigate(recoveryLink)} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-colors">
+                                View Receipt
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Sticky Categories */}
                 {!searchQuery && categories.length > 0 && (

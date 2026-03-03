@@ -9,7 +9,11 @@ const orderItemSchema = new mongoose.Schema({
     name: { type: String, required: true },
     quantity: { type: Number, required: true },
     unitPrice: { type: Number, required: true },
-    totalPrice: { type: Number, required: true }
+    totalPrice: { type: Number, required: true },
+    inventoryItemId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'InventoryItem'
+    }
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
