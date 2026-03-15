@@ -140,39 +140,20 @@ const CustomerMenu = () => {
 
             const res = await api.post(`/public/${vendorId}/order`, orderPayload);
             const { orderId, razorpayOrderId, amount } = res.data;
+            // DEMO BYPASS: Simulate Payment Success immediately
+            try {
+                await api.post(`/public/${vendorId}/order/verify-demo`, { orderId });
+            } catch (err) {
+                console.error("Demo verification failed:", err);
+            }
 
-            const options = {
-                key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_stub',
-                amount: amount,
-                currency: "INR",
-                name: vendorDetails.name,
-                description: "Order Payment",
-                order_id: razorpayOrderId,
-                handler: function () {
-                    setCart([]);
+            setCart([]);
 
-                    // Option A (Token Recovery): Store the last successful order
-                    const recoveryData = { vendorId, orderId, time: new Date().getTime() };
-                    localStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
+            // Option A (Token Recovery): Store the last successful order
+            const recoveryData = { vendorId, orderId, time: new Date().getTime() };
+            localStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
 
-                    navigate(`/q/${vendorId}/receipt/${orderId}`);
-                },
-                prefill: {
-                    name: "Customer",
-                    email: "customer@example.com",
-                    contact: customerPhone || "9999999999"
-                },
-                theme: {
-                    color: "#f97316" // Orange to match our primary theme
-                }
-            };
-
-            const rzp = new window.Razorpay(options);
-            rzp.on('payment.failed', function () {
-                setError('Payment failed. Please try again.');
-            });
-            rzp.open();
-
+            navigate(`/q/${vendorId}/receipt/${orderId}`);
         } catch (err) {
             if (err.response?.status === 403) {
                 setError('This vendor is not currently accepting orders.');

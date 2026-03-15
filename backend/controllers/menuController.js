@@ -9,10 +9,10 @@ exports.createMenuItem = async (req, res) => {
             vendorId,
             categoryId,
             name,
-            description,
+            description: description || undefined,
             price,
             imageUrl,
-            inventoryItemId
+            inventoryItemId: inventoryItemId || undefined
         });
 
         await item.save();
@@ -45,7 +45,15 @@ exports.updateMenuItem = async (req, res) => {
 
         const item = await MenuItem.findOneAndUpdate(
             { _id: id, vendorId }, // Multi-tenant scoping
-            { name, description, price, imageUrl, isAvailable, categoryId, inventoryItemId },
+            {
+                name,
+                description: description || undefined,
+                price,
+                imageUrl,
+                isAvailable,
+                categoryId,
+                inventoryItemId: inventoryItemId || undefined
+            },
             { new: true }
         );
 

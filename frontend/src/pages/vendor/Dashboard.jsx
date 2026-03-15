@@ -66,7 +66,8 @@ const Dashboard = () => {
             setInventoryItems(invRes.data || []);
             setOrders(ordersRes.data?.orders || []);
         } catch (err) {
-            setError('Failed to fetch dashboard data');
+            console.error('Dashboard Fetch Error:', err);
+            setError(`Failed to fetch dashboard data: ${err.response?.data?.error || err.message}`);
         } finally {
             setLoading(false);
         }

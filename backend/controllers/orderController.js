@@ -199,6 +199,35 @@ exports.razorpayWebhook = async (req, res) => {
     }
 };
 
+exports.verifyDemoPayment = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+
+        const orderRecord = await Order.findOneAndUpdate(
+            { _id: orderId },
+            { paymentStatus: 'SUCCESS' },
+            { new: true }
+        );
+
+        if (orderRecord) {
+            const io = req.app.get('io');
+            if (io) {
+                io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
+            }
+            try {
+                const { deductStock } = require('./inventoryController');
+                await deductStock(orderRecord.vendorId, orderRecord.items);
+            } catch (inventoryErr) {
+                console.error('[Inventory]', inventoryErr);
+            }
+        }
+        res.status(200).json({ status: 'ok', msg: 'Demo payment success simulated' });
+    } catch (error) {
+        console.error('Demo payment error:', error);
+        res.status(500).json({ error: 'Demo payment failed' });
+    }
+};
+
 exports.getOrderById = async (req, res) => {
     try {
         const { orderId } = req.params;
