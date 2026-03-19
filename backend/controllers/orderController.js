@@ -83,12 +83,7 @@ exports.createOrder = async (req, res) => {
             if (io) {
                 io.to(`vendor_${vendorId}`).emit('new_order', dbOrder);
             }
-            try {
-                const { deductStock } = require('./inventoryController');
-                await deductStock(vendorId, verifiedItems);
-            } catch (inventoryErr) {
-                console.error('[Inventory]', inventoryErr);
-            }
+
 
             return res.json({
                 success: true,
@@ -183,12 +178,7 @@ exports.razorpayWebhook = async (req, res) => {
                         if (io) {
                             io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
                         }
-                        try {
-                            const { deductStock } = require('./inventoryController');
-                            await deductStock(orderRecord.vendorId, orderRecord.items);
-                        } catch (inventoryErr) {
-                            console.error('[Inventory]', inventoryErr);
-                        }
+
                     }
                 } else {
                     // It's a Subscription Payment (no orderId attached)
@@ -238,12 +228,7 @@ exports.verifyDemoPayment = async (req, res) => {
             if (io) {
                 io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
             }
-            try {
-                const { deductStock } = require('./inventoryController');
-                await deductStock(orderRecord.vendorId, orderRecord.items);
-            } catch (inventoryErr) {
-                console.error('[Inventory]', inventoryErr);
-            }
+
         }
         res.status(200).json({ status: 'ok', msg: 'Demo payment success simulated' });
     } catch (error) {

@@ -44,7 +44,7 @@ const Dashboard = () => {
 
     // Form States
     const [newCatName, setNewCatName] = useState('');
-    const [newItem, setNewItem] = useState({ name: '', description: '', price: '', categoryId: '', imageUrl: '', inventoryItemId: '' });
+    const [newItem, setNewItem] = useState({ name: '', description: '', price: '', categoryId: '', imageUrl: '' });
     const [newInventoryItem, setNewInventoryItem] = useState({ itemName: '', quantity: '', unit: 'kg', unitPrice: '' });
     const [customPromoMessage, setCustomPromoMessage] = useState("Hey there! It's been a while. Aaj kya khaoge? Here's an exclusive 10% off your next visit. Order now!");
 
@@ -122,7 +122,7 @@ const Dashboard = () => {
                 ...newItem,
                 price: Number(newItem.price)
             });
-            setNewItem({ name: '', description: '', price: '', categoryId: '', imageUrl: '', inventoryItemId: '' });
+            setNewItem({ name: '', description: '', price: '', categoryId: '', imageUrl: '' });
             fetchData();
         } catch (err) {
             setError('Failed to create menu item');
@@ -638,15 +638,7 @@ const Dashboard = () => {
                                                     <label className="block text-xs font-bold text-secondary-700 uppercase tracking-widest">Image URL</label>
                                                     <input type="url" placeholder="https://example.com/food.jpg" value={newItem.imageUrl} onChange={e => setNewItem({ ...newItem, imageUrl: e.target.value })} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow" />
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <label className="block text-xs font-bold text-secondary-700 uppercase tracking-widest">Link to Inventory (Optional)</label>
-                                                    <select value={newItem.inventoryItemId} onChange={e => setNewItem({ ...newItem, inventoryItemId: e.target.value })} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow cursor-pointer">
-                                                        <option value="">No Inventory Link</option>
-                                                        {inventoryItems.map(inv => (
-                                                            <option key={inv._id} value={inv._id}>{inv.itemName} ({inv.quantity} {inv.unit} left)</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+
                                                 <div className="md:col-span-2 space-y-1">
                                                     <label className="block text-xs font-bold text-secondary-700 uppercase tracking-widest">Description</label>
                                                     <input type="text" placeholder="Brief appetizing description of the dish..." value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow" />

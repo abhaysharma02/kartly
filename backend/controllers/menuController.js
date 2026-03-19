@@ -2,7 +2,7 @@ const MenuItem = require('../models/MenuItem');
 
 exports.createMenuItem = async (req, res) => {
     try {
-        const { categoryId, name, description, price, imageUrl, inventoryItemId } = req.body;
+        const { categoryId, name, description, price, imageUrl } = req.body;
         const vendorId = req.vendorId;
 
         const item = new MenuItem({
@@ -11,8 +11,7 @@ exports.createMenuItem = async (req, res) => {
             name,
             description: description || undefined,
             price,
-            imageUrl,
-            inventoryItemId: inventoryItemId || undefined
+            imageUrl
         });
 
         await item.save();
@@ -40,7 +39,7 @@ exports.getMenuItems = async (req, res) => {
 exports.updateMenuItem = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, price, imageUrl, isAvailable, categoryId, inventoryItemId } = req.body;
+        const { name, description, price, imageUrl, isAvailable, categoryId } = req.body;
         const vendorId = req.vendorId;
 
         const item = await MenuItem.findOneAndUpdate(
@@ -51,8 +50,7 @@ exports.updateMenuItem = async (req, res) => {
                 price,
                 imageUrl,
                 isAvailable,
-                categoryId,
-                inventoryItemId: inventoryItemId || undefined
+                categoryId
             },
             { new: true }
         );
