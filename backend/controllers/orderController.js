@@ -15,7 +15,7 @@ const razorpay = new Razorpay({
 exports.createOrder = async (req, res) => {
     try {
         const { vendorId } = req.params; // From the public URL /q/:vendorId/order
-        const { items, customerPhone } = req.body;
+        const { items, customerPhone, paymentMethod = 'ONLINE' } = req.body;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ error: 'Cart is empty' });
@@ -60,6 +60,8 @@ exports.createOrder = async (req, res) => {
         const tokenNumber = tokenRecord.lastToken;
 
         // 2. Create Mongoose Order
+        const paymentStatus = paymentMethod === 'CASH' ? 'CASH_PENDING' : 'INITIATED';
+
         const dbOrder = new Order({
             vendorId,
             tokenNumber,
@@ -68,13 +70,34 @@ exports.createOrder = async (req, res) => {
             subtotal: calculatedSubtotal,
             taxAmount: calculatedTax,
             totalAmount: calculatedTotal,
-            paymentStatus: 'INITIATED',
+            paymentMethod: paymentMethod,
+            paymentStatus: paymentStatus,
             orderStatus: 'Pending'
         });
 
         await dbOrder.save();
 
-        // 3. Create Razorpay Order
+        if (paymentMethod === 'CASH') {
+            // For Cash on Delivery, we bypass Razorpay, tell the Kitchen, and deduct stock immediately.
+            const io = req.app.get('io');
+            if (io) {
+                io.to(`vendor_${vendorId}`).emit('new_order', dbOrder);
+            }
+            try {
+                const { deductStock } = require('./inventoryController');
+                await deductStock(vendorId, verifiedItems);
+            } catch (inventoryErr) {
+                console.error('[Inventory]', inventoryErr);
+            }
+
+            return res.json({
+                success: true,
+                orderId: dbOrder._id,
+                paymentMethod: 'CASH'
+            });
+        }
+
+        // 3. Create Razorpay Order (ONLINE ONLY)
         // Total amount in paise (multiply by 100)
         const rpOptions = {
             amount: Math.round(calculatedTotal * 100),
@@ -99,8 +122,9 @@ exports.createOrder = async (req, res) => {
             success: true,
             orderId: dbOrder._id,
             razorpayOrderId: rpOrder.id,
-            amount: rpOptions.amount,
-            tokenNumber
+            amount: rpOrder.amount,
+            currency: rpOrder.currency,
+            paymentMethod: 'ONLINE'
         });
 
     } catch (error) {

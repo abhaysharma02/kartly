@@ -210,8 +210,8 @@ const OrderReceipt = () => {
                     <div className="p-6 bg-success-50 border-t border-success-100 flex justify-between items-center">
                         <div>
                             <span className="font-black text-success-900 text-xl block">Grand Total</span>
-                            <span className={`text-xs font-bold px-2 py-0.5 mt-1 rounded uppercase tracking-widest ${order.paymentStatus === 'SUCCESS' ? 'bg-success-200 text-success-800' : 'bg-danger-200 text-danger-800'}`}>
-                                {order.paymentStatus === 'SUCCESS' ? 'PAID ONLINE' : 'PENDING'}
+                            <span className={`text-xs font-bold px-2 py-0.5 mt-1 rounded uppercase tracking-widest ${order.paymentMethod === 'CASH' ? 'bg-warning-200 text-warning-800' : order.paymentStatus === 'SUCCESS' ? 'bg-success-200 text-success-800' : 'bg-danger-200 text-danger-800'}`}>
+                                {order.paymentMethod === 'CASH' ? 'CASH ON DELIVERY' : order.paymentStatus === 'SUCCESS' ? 'PAID ONLINE' : 'PENDING'}
                             </span>
                         </div>
                         <span className="font-black text-3xl text-success-700">₹{order.totalAmount.toFixed(2)}</span>

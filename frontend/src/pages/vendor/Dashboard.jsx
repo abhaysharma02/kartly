@@ -477,10 +477,13 @@ const Dashboard = () => {
                                                         <div key={order._id} className={`bg-white border-2 rounded-2xl shadow-lg overflow-hidden flex flex-col h-full transform transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
                                                             {/* Ticket Header */}
                                                             <div className={`${headerClass} ${textClass} px-5 py-4 flex justify-between items-center shadow-inner`}>
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                                                                <div className="flex flex-col items-start gap-1">
+                                                                    <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm inline-block">
                                                                         <span className="font-black text-xl tracking-tight">#{order.tokenNumber}</span>
                                                                     </div>
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-black/20 text-white border border-white/10 shadow-sm">
+                                                                        {order.paymentMethod === 'CASH' ? 'CASH on Delivery' : 'PAID (Online)'}
+                                                                    </span>
                                                                 </div>
                                                                 <div className="text-right flex flex-col items-end">
                                                                     <span className="text-xs font-black uppercase tracking-widest opacity-80 mb-0.5">Status</span>

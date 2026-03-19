@@ -29,9 +29,14 @@ const orderSchema = new mongoose.Schema({
     subtotal: { type: Number, required: true },
     taxAmount: { type: Number, required: true },
     totalAmount: { type: Number, required: true },
+    paymentMethod: { 
+        type: String, 
+        enum: ['ONLINE', 'CASH'], 
+        default: 'ONLINE' 
+    },
     paymentStatus: {
         type: String,
-        enum: ['INITIATED', 'SUCCESS', 'FAILED'],
+        enum: ['INITIATED', 'SUCCESS', 'FAILED', 'CASH_PENDING'],
         default: 'INITIATED',
         index: true
     },
