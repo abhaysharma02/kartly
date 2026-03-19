@@ -53,25 +53,37 @@ const Dashboard = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [catsRes, itemsRes, custRes, subRes, invRes, ordersRes, settingsRes] = await Promise.all([
-                api.get('/vendor/categories'),
-                api.get('/vendor/menu-items'),
-                api.get('/vendor/customers'),
-                api.get('/vendor/subscription'),
-                api.get('/vendor/inventory'),
-                api.get('/vendor/orders'),
-                api.get('/vendor/settings')
-            ]);
-            setCategories(catsRes.data);
-            setMenuItems(itemsRes.data);
-            setCustomers(custRes.data?.customers || []);
-            setSubscription(subRes.data?.subscription || null);
-            setInventoryItems(invRes.data || []);
-            setOrders(ordersRes.data?.orders || []);
-            setSettings(settingsRes.data?.settings || { shopName: '', name: '', upiId: '' });
+            
+            // Fault-tolerant individual fetching
+            const safeFetch = async (endpoint, fallback = null) => {
+                try {
+                    const res = await api.get(endpoint);
+                    return res.data;
+                } catch (err) {
+                    console.error(`Failed to fetch ${endpoint}:`, err.message);
+                    return fallback;
+                }
+            };
+
+            const catsData = await safeFetch('/vendor/categories', []);
+            const itemsData = await safeFetch('/vendor/menu-items', []);
+            const custData = await safeFetch('/vendor/customers', { customers: [] });
+            const subData = await safeFetch('/vendor/subscription', { subscription: null });
+            const invData = await safeFetch('/vendor/inventory', []);
+            const ordersData = await safeFetch('/vendor/orders', { orders: [] });
+            const settingsData = await safeFetch('/vendor/settings', { settings: { shopName: '', name: '', upiId: '' } });
+
+            setCategories(Array.isArray(catsData) ? catsData : []);
+            setMenuItems(Array.isArray(itemsData) ? itemsData : []);
+            setCustomers(custData.customers || []);
+            setSubscription(subData.subscription || null);
+            setInventoryItems(Array.isArray(invData) ? invData : []);
+            setOrders(ordersData.orders || []);
+            setSettings(settingsData.settings || { shopName: '', name: '', upiId: '' });
+
         } catch (err) {
             console.error('Dashboard Fetch Error:', err);
-            setError(`Failed to fetch dashboard data: ${err.response?.data?.error || err.message}`);
+            setError(`Critical failure loading dashboard: ${err.message}`);
         } finally {
             setLoading(false);
         }
