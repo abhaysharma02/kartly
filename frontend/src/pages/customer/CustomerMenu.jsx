@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt, Trash2 } from 'lucide-react';
+import { IndianRupee, ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt, Trash2 } from 'lucide-react';
 
 const CustomerMenu = () => {
     const { vendorId } = useParams();
@@ -11,14 +11,17 @@ const CustomerMenu = () => {
     const [menuItems, setMenuItems] = useState([]);
     const [cart, setCart] = useState([]);
 
-    // Vendor Details (Fallback if not provided by public API easily, we can just show generic for now if needed, or fetch if available)
-    const [vendorDetails, setVendorDetails] = useState({ name: "Kartly Store", rating: "4.5", time: "20-25 mins", type: "Quick Bites" });
+    // Vendor Details (Fallback if not provided by public API easily)
+    const [vendorDetails, setVendorDetails] = useState({ name: "Kartly Store", businessName: "", upiId: "", rating: "4.5", time: "20-25 mins", type: "Quick Bites" });
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Checkout States
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState('ONLINE');
+    const [checkoutStep, setCheckoutStep] = useState('CART'); // 'CART' | 'PAYMENT' | 'UPI_INTENT'
+    const [paymentMethod, setPaymentMethod] = useState('UPI');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -43,14 +46,19 @@ const CustomerMenu = () => {
         const fetchMenu = async () => {
             try {
                 setLoading(true);
-                const [catsRes, itemsRes] = await Promise.all([
+                const [catsRes, itemsRes, infoRes] = await Promise.all([
                     api.get(`/public/${vendorId}/categories`),
-                    api.get(`/public/${vendorId}/menu-items`)
+                    api.get(`/public/${vendorId}/menu-items`),
+                    api.get(`/public/${vendorId}/info`).catch(err => ({ data: null }))
                 ]);
 
                 const activeCats = catsRes.data.filter(c => c.isActive);
                 setCategories(activeCats);
                 setMenuItems(itemsRes.data);
+
+                if (infoRes.data) {
+                    setVendorDetails(prev => ({ ...prev, ...infoRes.data }));
+                }
 
                 if (activeCats.length > 0) {
                     setActiveCategory(activeCats[0]._id);
@@ -127,6 +135,11 @@ const CustomerMenu = () => {
         }
     };
 
+    const closeCart = () => {
+        setIsCartOpen(false);
+        setTimeout(() => setCheckoutStep('CART'), 300);
+    };
+
     const handleCheckout = async () => {
         if (cart.length === 0) return;
         setIsCheckingOut(true);
@@ -144,23 +157,15 @@ const CustomerMenu = () => {
             };
 
             const res = await api.post(`/public/${vendorId}/order`, orderPayload);
-            const { orderId, razorpayOrderId, amount, paymentMethod: returnedMethod } = res.data;
-            
-            // If Cash, we bypass Razorpay inherently.
-            // But we already added 'verify-demo' previously for bypass testing. We can rely purely on the backend's CASH flag now!
-            if (returnedMethod === 'CASH') {
+            const { orderId, paymentMethod: returnedMethod } = res.data;
+
+            // If Cash or UPI, we bypass Razorpay natively on the backend now.
+            if (returnedMethod === 'CASH' || returnedMethod === 'UPI') {
                 setCart([]);
                 const recoveryData = { vendorId, orderId, time: new Date().getTime() };
                 localStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
                 navigate(`/q/${vendorId}/receipt/${orderId}`);
                 return;
-            }
-
-            // DEMO BYPASS for ONLINE modes (Simulate Payment Success immediately since Razorpay isn't fully configured with real credentials)
-            try {
-                await api.post(`/public/${vendorId}/order/verify-demo`, { orderId });
-            } catch (err) {
-                console.error("Demo verification failed:", err);
             }
 
             setCart([]);
@@ -178,18 +183,19 @@ const CustomerMenu = () => {
             }
         } finally {
             setIsCheckingOut(false);
-       // Filter items by search query and veg status
+        }
+    };
+
+    // Filter items by search query and veg status
     const filteredItems = menuItems.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                              (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
-        const matchesVeg = !vegOnly || item.isVeg !== false; 
+            (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
+        const matchesVeg = !vegOnly || item.isVeg !== false;
         // Note: isVeg logic: assuming isVeg is true unless explicitly false. 
         // If the model does not have isVeg, then this won't filter out anything. 
         // We will assume that if we want "Veg Only", we want things that are explicitly veg or not explicitly non-veg. Let's rely on standard logic.
         return matchesSearch && matchesVeg;
     });
-        }
-    };
 
     if (loading) {
         return (
@@ -240,29 +246,29 @@ const CustomerMenu = () => {
                                 <ShoppingBag className="w-8 h-8 opacity-20 mb-2" />
                             </div>
                         )}
+                    </div>
 
-                        {/* Floating Add Button Overlapping Image */}
-                        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-28 translate-y-1/2 z-10">
-                            {!isAvailable ? (
-                                <div className="bg-secondary-100 text-secondary-500 px-3 py-2 rounded-xl text-center font-black text-sm uppercase tracking-wider premium-shadow border border-secondary-200">
-                                    Sold Out
-                                </div>
-                            ) : qty > 0 ? (
-                                <div className="flex justify-between items-center bg-white rounded-xl premium-shadow border border-primary-100 overflow-hidden">
-                                    <button onClick={() => removeFromCart(item._id)} className="w-9 h-10 flex items-center justify-center text-primary-600 hover:bg-primary-50 active:bg-primary-100 font-black text-xl transition-colors">
-                                        -
-                                    </button>
-                                    <span className="font-black text-primary-600 text-md">{qty}</span>
-                                    <button onClick={() => addToCart(item)} className="w-9 h-10 flex items-center justify-center text-primary-600 hover:bg-primary-50 active:bg-primary-100 font-black text-xl transition-colors">
-                                        +
-                                    </button>
-                                </div>
-                            ) : (
-                                <button onClick={() => addToCart(item)} className="w-full bg-white text-primary-600 hover:bg-primary-50 px-3 py-2 rounded-xl text-center font-black text-[15px] premium-shadow border border-primary-100 tracking-wide uppercase transition-colors relative">
-                                    ADD <span className="absolute top-1 right-2 text-xs font-black">+</span>
+                    {/* Floating Add Button Extracted outside overflow to prevent click blocking */}
+                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-28 z-20">
+                        {!isAvailable ? (
+                            <div className="bg-secondary-100 text-secondary-500 px-3 py-2 rounded-xl text-center font-black text-sm uppercase tracking-wider premium-shadow border border-secondary-200">
+                                Sold Out
+                            </div>
+                        ) : qty > 0 ? (
+                            <div className="flex justify-between items-center bg-white rounded-xl premium-shadow border border-primary-100 overflow-hidden">
+                                <button onClick={() => removeFromCart(item._id)} className="w-9 h-10 flex items-center justify-center text-primary-600 hover:bg-primary-50 active:bg-primary-100 font-black text-xl transition-colors">
+                                    -
                                 </button>
-                            )}
-                        </div>
+                                <span className="font-black text-primary-600 text-md">{qty}</span>
+                                <button onClick={() => addToCart(item)} className="w-9 h-10 flex items-center justify-center text-primary-600 hover:bg-primary-50 active:bg-primary-100 font-black text-xl transition-colors">
+                                    +
+                                </button>
+                            </div>
+                        ) : (
+                            <button onClick={() => addToCart(item)} className="w-full bg-white text-primary-600 hover:bg-primary-50 px-3 py-2 rounded-xl text-center font-black text-[15px] premium-shadow border border-primary-100 tracking-wide uppercase transition-colors relative shadow-lg shadow-primary-500/10">
+                                ADD <span className="absolute top-1 right-2 text-xs font-black">+</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -460,94 +466,159 @@ const CustomerMenu = () => {
 
             {/* Cart Modal Overlay */}
             {isCartOpen && (
-                <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-fade-in" onClick={() => setIsCartOpen(false)}>
-                    <div className="bg-white w-full max-w-2xl rounded-t-3xl p-6 md:p-8 flex flex-col max-h-[90vh] shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-fade-in" onClick={closeCart}>
+                    <div className="bg-white w-full max-w-2xl rounded-t-3xl p-6 md:p-8 flex flex-col max-h-[90vh] shadow-2xl animate-slide-up relative" onClick={e => e.stopPropagation()}>
+
+                        {/* Header Context */}
                         <div className="flex justify-between items-center mb-6 border-b border-secondary-100 pb-4">
-                            <h2 className="text-2xl font-black text-secondary-900 tracking-tight">Your Cart</h2>
+                            <div className="flex items-center gap-3">
+                                {checkoutStep !== 'CART' && (
+                                    <button onClick={() => setCheckoutStep(checkoutStep === 'UPI_INTENT' ? 'PAYMENT' : 'CART')} className="w-10 h-10 rounded-full bg-secondary-50 hover:bg-secondary-100 flex items-center justify-center">
+                                        <ChevronLeft className="w-5 h-5 text-secondary-600" />
+                                    </button>
+                                )}
+                                <h2 className="text-2xl font-black text-secondary-900 tracking-tight">
+                                    {checkoutStep === 'CART' ? 'Your Cart' : checkoutStep === 'PAYMENT' ? 'Checkout' : 'Payment'}
+                                </h2>
+                            </div>
                             <div className="flex gap-2 items-center">
-                                <button onClick={() => setCart([])} className="flex items-center gap-1.5 text-secondary-500 hover:text-danger-600 transition-colors font-bold text-sm px-3 py-1.5 rounded-lg border border-secondary-200 hover:border-danger-200 bg-secondary-50 hover:bg-danger-50">
-                                    <Trash2 className="w-4 h-4" /> Clear
-                                </button>
-                                <button onClick={() => setIsCartOpen(false)} className="w-10 h-10 rounded-full bg-secondary-100 hover:bg-secondary-200 flex items-center justify-center transition-colors">
+                                {checkoutStep === 'CART' && (
+                                    <button onClick={() => setCart([])} className="flex items-center gap-1.5 text-secondary-500 hover:text-danger-600 transition-colors font-bold text-sm px-3 py-1.5 rounded-lg border border-secondary-200 hover:border-danger-200 bg-secondary-50 hover:bg-danger-50">
+                                        <Trash2 className="w-4 h-4" /> Clear
+                                    </button>
+                                )}
+                                <button onClick={closeCart} className="w-10 h-10 rounded-full bg-secondary-100 hover:bg-secondary-200 flex items-center justify-center transition-colors">
                                     <X className="w-6 h-6 text-secondary-600" />
                                 </button>
                             </div>
                         </div>
 
-                        <div className="overflow-y-auto flex-1 pr-2 no-scrollbar space-y-4 mb-6">
-                            {cart.map(item => (
-                                <div key={item.menuItemId} className="flex justify-between items-center py-3 border-b border-secondary-100 last:border-0">
-                                    <div className="flex-1">
-                                        <h4 className="font-bold text-secondary-900 text-sm line-clamp-1 pr-2">{item.name}</h4>
-                                        <p className="text-primary-600 font-black text-sm mt-0.5">₹{item.unitPrice}</p>
+                        {/* STEP 1: CART */}
+                        {checkoutStep === 'CART' && (
+                            <>
+                                <div className="overflow-y-auto flex-1 pr-2 no-scrollbar space-y-4 mb-6">
+                                    {cart.map(item => (
+                                        <div key={item.menuItemId} className="flex justify-between items-center py-3 border-b border-secondary-100 last:border-0">
+                                            <div className="flex-1">
+                                                <h4 className="font-bold text-secondary-900 text-sm line-clamp-1 pr-2">{item.name}</h4>
+                                                <p className="text-primary-600 font-black text-sm mt-0.5">₹{item.unitPrice}</p>
+                                            </div>
+                                            <div className="flex items-center bg-secondary-50 border border-secondary-200 rounded-xl overflow-hidden ml-2 flex-shrink-0">
+                                                <button onClick={() => removeFromCart(item.menuItemId)} className="w-8 h-8 flex items-center justify-center text-secondary-600 hover:bg-secondary-100 font-bold hover:text-danger-600 transition-colors">-</button>
+                                                <span className="w-8 text-center text-sm font-black text-secondary-900">{item.quantity}</span>
+                                                <button onClick={() => addToCart({ _id: item.menuItemId, name: item.name, price: item.unitPrice })} className="w-8 h-8 flex items-center justify-center text-secondary-600 hover:bg-secondary-100 font-bold hover:text-success-600 transition-colors">+</button>
+                                            </div>
+                                            <div className="w-16 text-right font-black text-secondary-900 flex-shrink-0">
+                                                ₹{item.totalPrice}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="bg-secondary-50 p-5 rounded-2xl mb-6 border border-secondary-100">
+                                    <div className="flex justify-between text-sm text-secondary-600 font-medium mb-2">
+                                        <span>Subtotal</span>
+                                        <span>₹{cartTotal.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex items-center bg-secondary-50 border border-secondary-200 rounded-xl overflow-hidden ml-2 flex-shrink-0">
-                                        <button onClick={() => removeFromCart(item.menuItemId)} className="w-8 h-8 flex items-center justify-center text-secondary-600 hover:bg-secondary-100 font-bold hover:text-danger-600 transition-colors">-</button>
-                                        <span className="w-8 text-center text-sm font-black text-secondary-900">{item.quantity}</span>
-                                        <button onClick={() => addToCart({_id: item.menuItemId, name: item.name, price: item.unitPrice})} className="w-8 h-8 flex items-center justify-center text-secondary-600 hover:bg-secondary-100 font-bold hover:text-success-600 transition-colors">+</button>
+                                    <div className="flex justify-between text-sm text-secondary-600 font-medium mb-4 pb-4 border-b border-secondary-200 border-dashed">
+                                        <span>Taxes (5% GST)</span>
+                                        <span>₹{(cartTotal * 0.05).toFixed(2)}</span>
                                     </div>
-                                    <div className="w-16 text-right font-black text-secondary-900 flex-shrink-0">
-                                        ₹{item.totalPrice}
+                                    <div className="flex justify-between text-lg font-black text-secondary-900">
+                                        <span>Grand Total</span>
+                                        <span>₹{(cartTotal * 1.05).toFixed(2)}</span>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
 
-                        <div className="bg-secondary-50 p-5 rounded-2xl mb-6 border border-secondary-100">
-                            <div className="flex justify-between text-sm text-secondary-600 font-medium mb-2">
-                                <span>Subtotal</span>
-                                <span>₹{cartTotal.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm text-secondary-600 font-medium mb-4 pb-4 border-b border-secondary-200 border-dashed">
-                                <span>Taxes (5% GST)</span>
-                                <span>₹{(cartTotal * 0.05).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-lg font-black text-secondary-900">
-                                <span>Grand Total</span>
-                                <span>₹{(cartTotal * 1.05).toFixed(2)}</span>
-                            </div>
-                        </div>
+                                <button
+                                    onClick={() => setCheckoutStep('PAYMENT')}
+                                    disabled={cart.length === 0}
+                                    className="w-full bg-primary-600 text-white font-black py-4 rounded-xl text-lg hover:bg-primary-700 active:bg-primary-800 transition-colors shadow-lg shadow-primary-500/30 flex justify-center items-center gap-2 disabled:opacity-70"
+                                >
+                                    Proceed to Checkout
+                                </button>
+                            </>
+                        )}
 
-                        <div className="mb-6 space-y-3">
-                            <h3 className="font-bold text-secondary-900 mb-2">Contact Info (Optional)</h3>
-                            <div className="flex gap-3">
-                                <input type="text" placeholder="Your Name" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow placeholder:text-secondary-400" />
-                                <input type="tel" placeholder="Phone Number" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow placeholder:text-secondary-400" />
-                            </div>
-                        </div>
 
-                        <div className="mb-6 space-y-3">
-                            <h3 className="font-bold text-secondary-900 mb-2">Select Payment Method</h3>
-                            <label className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-all ${paymentMethod === 'ONLINE' ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500/20' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}>
-                                <input type="radio" name="paymentMethod" value="ONLINE" checked={paymentMethod === 'ONLINE'} onChange={() => setPaymentMethod('ONLINE')} className="w-5 h-5 text-primary-600 focus:ring-primary-500 border-secondary-300" />
-                                <div className="ml-3 flex-1 flex justify-between items-center">
-                                    <span className="font-bold text-secondary-900">Pay Online (UPI / Card)</span>
-                                    <span className="text-xs font-bold bg-primary-100 text-primary-700 px-2 py-1 rounded-md">Recommended</span>
+                        {/* STEP 2: PAYMENT INFO */}
+                        {checkoutStep === 'PAYMENT' && (
+                            <>
+                                <div className="mb-6 space-y-3">
+                                    <h3 className="font-bold text-secondary-900 mb-2">Contact Info (Optional)</h3>
+                                    <div className="flex gap-3">
+                                        <input type="text" placeholder="Your Name" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow placeholder:text-secondary-400" />
+                                        <input type="tel" placeholder="Phone Number" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow placeholder:text-secondary-400" />
+                                    </div>
                                 </div>
-                            </label>
 
-                            <label className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-all ${paymentMethod === 'CASH' ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500/20' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}>
-                                <input type="radio" name="paymentMethod" value="CASH" checked={paymentMethod === 'CASH'} onChange={() => setPaymentMethod('CASH')} className="w-5 h-5 text-primary-600 focus:ring-primary-500 border-secondary-300" />
-                                <div className="ml-3">
-                                    <span className="font-bold text-secondary-900">Cash on Delivery</span>
+                                <div className="mb-8 space-y-3">
+                                    <h3 className="font-bold text-secondary-900 mb-2">Select Payment Method</h3>
+                                    <label className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-all ${paymentMethod === 'UPI' ? 'border-success-500 bg-success-50 ring-2 ring-success-500/20' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}>
+                                        <input type="radio" name="paymentMethod" value="UPI" checked={paymentMethod === 'UPI'} onChange={() => setPaymentMethod('UPI')} className="w-5 h-5 text-success-600 focus:ring-success-500 border-secondary-300" />
+                                        <div className="ml-3 flex-1 flex justify-between items-center">
+                                            <span className="font-bold text-secondary-900">Pay via UPI App</span>
+                                            <span className="text-xs font-bold bg-success-100 text-success-700 px-2 py-1 rounded-md">Instant</span>
+                                        </div>
+                                    </label>
+
+                                    <label className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-all ${paymentMethod === 'CASH' ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500/20' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}>
+                                        <input type="radio" name="paymentMethod" value="CASH" checked={paymentMethod === 'CASH'} onChange={() => setPaymentMethod('CASH')} className="w-5 h-5 text-primary-600 focus:ring-primary-500 border-secondary-300" />
+                                        <div className="ml-3">
+                                            <span className="font-bold text-secondary-900">Cash on Delivery</span>
+                                        </div>
+                                    </label>
                                 </div>
-                            </label>
-                        </div>
 
-                        <button 
-                            onClick={handleCheckout} 
-                            disabled={isCheckingOut || cart.length === 0}
-                            className="w-full bg-primary-600 text-white font-black py-4 rounded-xl text-lg hover:bg-primary-700 active:bg-primary-800 transition-colors shadow-lg shadow-primary-500/30 flex justify-center items-center gap-2 disabled:opacity-70"
-                        >
-                            {isCheckingOut ? (
-                                <>
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    Processing...
-                                </>
-                            ) : (
-                                `Confirm Order • ₹${(cartTotal * 1.05).toFixed(2)}`
-                            )}
-                        </button>
+                                <button
+                                    onClick={(e) => {
+                                        if (paymentMethod === 'UPI') setCheckoutStep('UPI_INTENT');
+                                        else handleCheckout(e);
+                                    }}
+                                    disabled={isCheckingOut}
+                                    className="w-full bg-secondary-900 text-white font-black py-4 rounded-xl text-lg hover:bg-black transition-colors shadow-lg flex justify-center items-center disabled:opacity-70"
+                                >
+                                    Continue to Confirm
+                                </button>
+                            </>
+                        )}
+
+
+                        {/* STEP 3: UPI INTENT */}
+                        {checkoutStep === 'UPI_INTENT' && (
+                            <div className="flex flex-col items-center py-4 space-y-5 animate-fade-in text-center">
+                                <div className="w-20 h-20 bg-success-50 rounded-full flex items-center justify-center border-4 border-success-100 shadow-inner mb-2">
+                                    <span className="text-3xl font-black text-success-600">₹</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-secondary-900">Complete Payment</h3>
+                                    <p className="text-secondary-500 font-medium text-sm mt-1 max-w-[250px] mx-auto">
+                                        Tap below to safely open your UPI App and pay <span className="text-secondary-900 font-bold">₹{(cartTotal * 1.05).toFixed(2)}</span>
+                                    </p>
+                                </div>
+
+                                <a
+                                    href={`upi://pay?pa=${vendorDetails.upiId}&pn=${vendorDetails.businessName}&am=${(cartTotal * 1.05).toFixed(2)}&cu=INR`}
+                                    className="w-full bg-success-600 text-white font-black py-4 rounded-xl text-lg hover:bg-success-700 transition-colors shadow-lg shadow-success-600/30 flex justify-center items-center mt-4"
+                                >
+                                    Pay via UPI App
+                                </a>
+
+                                <div className="w-full relative py-2">
+                                    <div className="absolute inset-x-0 top-1/2 h-px bg-secondary-200"></div>
+                                    <span className="relative bg-white px-3 text-xs font-bold text-secondary-400 uppercase tracking-widest leading-none block w-max mx-auto">Then</span>
+                                </div>
+
+                                <button
+                                    onClick={handleCheckout}
+                                    disabled={isCheckingOut}
+                                    className="w-full bg-secondary-900 text-white font-black py-4 rounded-xl text-lg hover:bg-black transition-colors shadow-lg flex justify-center items-center relative overflow-hidden disabled:opacity-70"
+                                >
+                                    {isCheckingOut ? 'Confirming...' : 'I Have Paid'}
+                                </button>
+                            </div>
+                        )}
+
                     </div>
                 </div>
             )}

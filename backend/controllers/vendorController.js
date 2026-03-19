@@ -3,6 +3,7 @@ const MenuItem = require('../models/MenuItem');
 const Subscription = require('../models/Subscription');
 const Order = require('../models/Order');
 const Plan = require('../models/Plan');
+const Vendor = require('../models/Vendor');
 const Razorpay = require('razorpay');
 
 const razorpay = new Razorpay({
@@ -49,6 +50,25 @@ exports.generateQR = async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ error: 'Server error generating QR code' });
+    }
+};
+
+exports.getPublicVendorInfo = async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+        const vendor = await Vendor.findById(vendorId).select('name shopName upiId');
+        if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+        
+        res.json({
+            name: vendor.shopName,
+            businessName: vendor.name,
+            upiId: vendor.upiId || '',
+            rating: "4.5", // Static aesthetics for MVP
+            time: "20-25 mins",
+            type: "Quick Bites"
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error fetching vendor info' });
     }
 };
 

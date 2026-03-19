@@ -12,6 +12,7 @@ const { getMenuItems } = require('../controllers/menuController');
 // We use the same controllers but without auth middleware! They read from req.params
 router.get('/:vendorId/categories', getCategories);
 router.get('/:vendorId/menu-items', getMenuItems);
+router.get('/:vendorId/info', require('../controllers/vendorController').getPublicVendorInfo);
 
 // 2. Place an order (Requires active subscription check first)
 router.post('/:vendorId/order', requireActiveSubscription, orderController.createOrder);

@@ -31,7 +31,7 @@ const orderSchema = new mongoose.Schema({
     totalAmount: { type: Number, required: true },
     paymentMethod: { 
         type: String, 
-        enum: ['ONLINE', 'CASH'], 
+        enum: ['ONLINE', 'CASH', 'UPI'],
         default: 'ONLINE' 
     },
     paymentStatus: {

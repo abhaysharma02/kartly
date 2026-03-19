@@ -60,7 +60,9 @@ exports.createOrder = async (req, res) => {
         const tokenNumber = tokenRecord.lastToken;
 
         // 2. Create Mongoose Order
-        const paymentStatus = paymentMethod === 'CASH' ? 'CASH_PENDING' : 'INITIATED';
+        let paymentStatus = 'INITIATED';
+        if (paymentMethod === 'CASH') paymentStatus = 'CASH_PENDING';
+        if (paymentMethod === 'UPI') paymentStatus = 'PAID'; // Trusted from Vendor UPI Intent button
 
         const dbOrder = new Order({
             vendorId,
@@ -77,18 +79,17 @@ exports.createOrder = async (req, res) => {
 
         await dbOrder.save();
 
-        if (paymentMethod === 'CASH') {
-            // For Cash on Delivery, we bypass Razorpay, tell the Kitchen, and deduct stock immediately.
+        if (paymentMethod === 'CASH' || paymentMethod === 'UPI') {
+            // We bypass Razorpay, tell the Kitchen immediately!
             const io = req.app.get('io');
             if (io) {
                 io.to(`vendor_${vendorId}`).emit('new_order', dbOrder);
             }
 
-
             return res.json({
                 success: true,
                 orderId: dbOrder._id,
-                paymentMethod: 'CASH'
+                paymentMethod: paymentMethod
             });
         }
 
