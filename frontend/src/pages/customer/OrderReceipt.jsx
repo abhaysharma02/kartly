@@ -121,8 +121,11 @@ const OrderReceipt = () => {
                         {getStatusIcon()}
                     </div>
 
-                    <h2 className="text-2xl font-black text-secondary-900 mb-2">{getStatusText()}</h2>
-                    <p className="text-secondary-500 font-medium mb-6">Token #{order.tokenNumber}</p>
+                    <div className="mb-10">
+                        <p className="text-secondary-500 font-bold uppercase tracking-widest text-sm mb-1">Your Order Token</p>
+                        <h1 className="text-7xl md:text-8xl font-black text-primary-500 tracking-tighter drop-shadow-sm py-2">#{order.tokenNumber}</h1>
+                        <h2 className="text-xl font-bold text-secondary-900 mt-2">{getStatusText()}</h2>
+                    </div>
 
                     {/* Progress Steps */}
                     <div className="flex justify-between items-center max-w-xs mx-auto relative px-2 mb-2">

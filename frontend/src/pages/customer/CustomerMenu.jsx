@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt } from 'lucide-react';
+import { ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt, Trash2 } from 'lucide-react';
 
 const CustomerMenu = () => {
     const { vendorId } = useParams();
@@ -17,12 +17,12 @@ const CustomerMenu = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Checkout States
-    const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('ONLINE');
     const [customerPhone, setCustomerPhone] = useState('');
+    const [customerName, setCustomerName] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [vegOnly, setVegOnly] = useState(false);
     const [activeCategory, setActiveCategory] = useState('');
     const [recoveryLink, setRecoveryLink] = useState(null);
 
@@ -138,7 +138,9 @@ const CustomerMenu = () => {
                 subtotal: cartTotal,
                 taxAmount: cartTotal * 0.05,
                 totalAmount: cartTotal * 1.05,
-                paymentMethod: paymentMethod
+                paymentMethod: paymentMethod,
+                customerPhone: customerPhone,
+                customerName: customerName
             };
 
             const res = await api.post(`/public/${vendorId}/order`, orderPayload);
@@ -176,13 +178,18 @@ const CustomerMenu = () => {
             }
         } finally {
             setIsCheckingOut(false);
+       // Filter items by search query and veg status
+    const filteredItems = menuItems.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
+        const matchesVeg = !vegOnly || item.isVeg !== false; 
+        // Note: isVeg logic: assuming isVeg is true unless explicitly false. 
+        // If the model does not have isVeg, then this won't filter out anything. 
+        // We will assume that if we want "Veg Only", we want things that are explicitly veg or not explicitly non-veg. Let's rely on standard logic.
+        return matchesSearch && matchesVeg;
+    });
         }
     };
-
-    const filteredItems = menuItems.filter(item =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
 
     if (loading) {
         return (
@@ -214,10 +221,12 @@ const CustomerMenu = () => {
         return (
             <div key={item._id} className={`flex justify-between gap-4 py-6 border-b border-secondary-100 border-dashed last:border-0 ${!isAvailable ? 'opacity-60 grayscale-[50%]' : ''}`}>
                 <div className="flex-1 pr-4">
-                    <div className={`w-4 h-4 rounded-sm border ${item.isVeg !== false ? 'border-success-500' : 'border-danger-500'} flex items-center justify-center mb-2`}>
-                        <div className={`w-2 h-2 rounded-full ${item.isVeg !== false ? 'bg-success-500' : 'bg-danger-500'}`}></div>
+                    <div className="flex items-start gap-2 mb-1">
+                        <div className={`w-4 h-4 rounded-sm border ${item.isVeg !== false ? 'border-success-500' : 'border-danger-500'} flex items-center justify-center flex-shrink-0 mt-1`}>
+                            <div className={`w-2 h-2 rounded-full ${item.isVeg !== false ? 'bg-success-500' : 'bg-danger-500'}`}></div>
+                        </div>
+                        <h3 className="font-black text-secondary-900 text-lg leading-tight">{item.name}</h3>
                     </div>
-                    <h3 className="font-black text-secondary-900 text-lg leading-tight mb-1">{item.name}</h3>
                     <p className="font-bold text-secondary-900 text-md mb-2">₹{item.price}</p>
                     <p className="text-sm text-secondary-500 font-medium line-clamp-2 leading-relaxed">{item.description}</p>
                 </div>
@@ -277,45 +286,64 @@ const CustomerMenu = () => {
                     </div>
                 </div>
 
-                {/* Vendor Info Section */}
-                <div className="max-w-2xl mx-auto px-4 py-5 bg-white shadow-sm">
-                    <div className="flex justify-between items-start mb-4">
-                        <div>
-                            <h1 className="text-2xl font-black text-secondary-900 tracking-tight">{vendorDetails.name}</h1>
-                            <p className="text-sm text-secondary-500 font-medium mt-1">{vendorDetails.type}</p>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <div className="flex items-center gap-1 bg-success-600 text-white px-2 py-1 rounded-lg shadow-sm">
-                                <span className="font-bold text-sm">{vendorDetails.rating}</span>
-                                <Star className="w-3.5 h-3.5 fill-current" />
+                {/* Hero Banner Area */}
+                <div className="relative h-48 md:h-64 w-full bg-secondary-900 border-b-4 border-primary-500 shadow-md">
+                    <img src={vendorDetails.coverImage || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1920&q=80'} alt="Restaurant Cover" className="w-full h-full object-cover opacity-60 mix-blend-overlay" />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent p-4 pb-6 z-10">
+                        <div className="max-w-2xl mx-auto flex justify-between items-end">
+                            <div>
+                                <h1 className="text-3xl font-black text-white tracking-tight drop-shadow-md">{vendorDetails.name}</h1>
+                                <p className="text-sm font-bold text-gray-300 mt-1 flex items-center gap-1.5 drop-shadow">
+                                    <ChefHat className="w-4 h-4 text-primary-400" /> {vendorDetails.type}
+                                </p>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <div className="flex items-center gap-1.5 bg-success-600/90 backdrop-blur-sm text-white px-2.5 py-1.5 rounded-xl border border-success-400/30 shadow-lg">
+                                    <span className="font-black text-sm">{vendorDetails.rating}</span>
+                                    <Star className="w-4 h-4 fill-current pt-0.5" />
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div className="flex gap-4 items-center mb-5 bg-secondary-50 px-4 py-3 rounded-2xl border border-secondary-100">
-                        <div className="flex gap-2 items-center text-sm font-bold text-secondary-700">
-                            <Clock className="w-4 h-4 text-primary-500" />
+                {/* Vendor Info Section */}
+                <div className="max-w-2xl mx-auto px-4 py-5 bg-white shadow-sm rounded-b-3xl relative z-20 -mt-4 pb-6 border-x border-b border-secondary-100">
+                    <div className="flex gap-4 items-center mb-5 bg-secondary-50 px-4 py-3 rounded-2xl border border-secondary-200 shadow-inner">
+                        <div className="flex gap-2 items-center text-sm font-black text-secondary-800 tracking-tight">
+                            <Clock className="w-4.5 h-4.5 text-primary-600" />
                             <span>{vendorDetails.time}</span>
                         </div>
-                        <div className="w-1 h-1 rounded-full bg-secondary-300"></div>
-                        <div className="flex gap-2 items-center text-sm font-medium text-secondary-600">
-                            <Info className="w-4 h-4" />
-                            <span>Details</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary-200"></div>
+                        <div className="flex gap-2 items-center text-sm font-bold text-secondary-600 tracking-tight hover:text-primary-600 transition-colors cursor-pointer">
+                            <Info className="w-4.5 h-4.5" />
+                            <span>Restaurant Details</span>
                         </div>
                     </div>
 
-                    {/* Search Bar */}
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <Search className="w-5 h-5 text-secondary-400" />
+                    {/* Search Bar & Veg Filter */}
+                    <div className="flex flex-col gap-3">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <Search className="w-5 h-5 text-secondary-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search for dishes..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="bg-white border-2 border-secondary-100 text-secondary-900 text-sm rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 block w-full pl-11 p-3.5 font-bold transition-all outline-none shadow-sm placeholder:font-medium"
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Search for dishes..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-secondary-50 border border-secondary-100 text-secondary-900 text-sm rounded-2xl focus:ring-primary-500 focus:border-primary-500 block w-full pl-11 p-3.5 font-medium transition-all outline-none"
-                        />
+                        <div className="flex items-center">
+                            <label className={`flex items-center gap-2 cursor-pointer transition-all px-3 py-1.5 rounded-full border-2 ${vegOnly ? 'border-success-500 bg-success-50 ring-2 ring-success-500/20' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}>
+                                <div className="relative inline-flex items-center h-5 w-9 rounded-full transition-colors cursor-pointer mr-0.5">
+                                    <input type="checkbox" checked={vegOnly} onChange={() => setVegOnly(!vegOnly)} className="sr-only peer" />
+                                    <div className={`w-9 h-5 bg-secondary-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${vegOnly ? 'bg-success-500' : ''}`}></div>
+                                </div>
+                                <span className={`text-sm font-black tracking-tight ${vegOnly ? 'text-success-700' : 'text-secondary-600'}`}>Veg Only</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -434,11 +462,16 @@ const CustomerMenu = () => {
             {isCartOpen && (
                 <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-fade-in" onClick={() => setIsCartOpen(false)}>
                     <div className="bg-white w-full max-w-2xl rounded-t-3xl p-6 md:p-8 flex flex-col max-h-[90vh] shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
+                        <div className="flex justify-between items-center mb-6 border-b border-secondary-100 pb-4">
                             <h2 className="text-2xl font-black text-secondary-900 tracking-tight">Your Cart</h2>
-                            <button onClick={() => setIsCartOpen(false)} className="w-10 h-10 rounded-full bg-secondary-100 hover:bg-secondary-200 flex items-center justify-center transition-colors">
-                                <X className="w-6 h-6 text-secondary-600" />
-                            </button>
+                            <div className="flex gap-2 items-center">
+                                <button onClick={() => setCart([])} className="flex items-center gap-1.5 text-secondary-500 hover:text-danger-600 transition-colors font-bold text-sm px-3 py-1.5 rounded-lg border border-secondary-200 hover:border-danger-200 bg-secondary-50 hover:bg-danger-50">
+                                    <Trash2 className="w-4 h-4" /> Clear
+                                </button>
+                                <button onClick={() => setIsCartOpen(false)} className="w-10 h-10 rounded-full bg-secondary-100 hover:bg-secondary-200 flex items-center justify-center transition-colors">
+                                    <X className="w-6 h-6 text-secondary-600" />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="overflow-y-auto flex-1 pr-2 no-scrollbar space-y-4 mb-6">
@@ -472,6 +505,14 @@ const CustomerMenu = () => {
                             <div className="flex justify-between text-lg font-black text-secondary-900">
                                 <span>Grand Total</span>
                                 <span>₹{(cartTotal * 1.05).toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className="mb-6 space-y-3">
+                            <h3 className="font-bold text-secondary-900 mb-2">Contact Info (Optional)</h3>
+                            <div className="flex gap-3">
+                                <input type="text" placeholder="Your Name" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow placeholder:text-secondary-400" />
+                                <input type="tel" placeholder="Phone Number" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-shadow placeholder:text-secondary-400" />
                             </div>
                         </div>
 
