@@ -19,7 +19,8 @@ import {
     TrendingUp,
     Store,
     PackageOpen,
-    Trash2
+    Trash2,
+    IndianRupee
 } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
@@ -37,6 +38,7 @@ const Dashboard = () => {
     const [customers, setCustomers] = useState([]);
     const [subscription, setSubscription] = useState(null);
     const [inventoryItems, setInventoryItems] = useState([]);
+    const [settings, setSettings] = useState({ shopName: '', name: '', upiId: '' });
 
     // UI States
     const [loading, setLoading] = useState(true);
@@ -51,13 +53,14 @@ const Dashboard = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [catsRes, itemsRes, custRes, subRes, invRes, ordersRes] = await Promise.all([
+            const [catsRes, itemsRes, custRes, subRes, invRes, ordersRes, settingsRes] = await Promise.all([
                 api.get('/vendor/categories'),
                 api.get('/vendor/menu-items'),
                 api.get('/vendor/customers'),
                 api.get('/vendor/subscription'),
                 api.get('/vendor/inventory'),
-                api.get('/vendor/orders')
+                api.get('/vendor/orders'),
+                api.get('/vendor/settings')
             ]);
             setCategories(catsRes.data);
             setMenuItems(itemsRes.data);
@@ -65,6 +68,7 @@ const Dashboard = () => {
             setSubscription(subRes.data?.subscription || null);
             setInventoryItems(invRes.data || []);
             setOrders(ordersRes.data?.orders || []);
+            setSettings(settingsRes.data?.settings || { shopName: '', name: '', upiId: '' });
         } catch (err) {
             console.error('Dashboard Fetch Error:', err);
             setError(`Failed to fetch dashboard data: ${err.response?.data?.error || err.message}`);
@@ -85,6 +89,11 @@ const Dashboard = () => {
 
             socket.on('new_order', (orderData) => {
                 setOrders(prev => [orderData, ...prev]);
+            });
+
+            socket.on('vendor_orders_refresh', () => {
+                // Background refresh when other devices update an order
+                api.get('/vendor/orders').then(res => setOrders(res.data?.orders || []));
             });
 
             return () => {
@@ -137,6 +146,20 @@ const Dashboard = () => {
             fetchData();
         } catch (err) {
             setError('Failed to add inventory item');
+        }
+    };
+
+    const handleUpdateSettings = async (e) => {
+        e.preventDefault();
+        try {
+            setLoading(true);
+            const res = await api.put('/vendor/settings', settings);
+            setSettings(res.data.settings);
+            alert('Settings completely saved!');
+        } catch (err) {
+            setError('Failed to update Settings: ' + err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -1041,12 +1064,58 @@ const Dashboard = () => {
 
                                 {/* Settings Tab */}
                                 {activeTab === 'settings' && (
-                                    <div className="bg-white rounded-2xl premium-shadow border border-secondary-100 overflow-hidden flex flex-col items-center justify-center p-16 text-center">
-                                        <div className="w-20 h-20 bg-secondary-50 rounded-full flex items-center justify-center mb-6">
-                                            <Settings className="w-10 h-10 text-secondary-400 animate-spin-slow" />
-                                        </div>
-                                        <h3 className="text-2xl font-black text-secondary-900 mb-2">Settings Coming Soon</h3>
-                                        <p className="text-secondary-500 font-medium max-w-sm">We are currently building the advanced store settings interface. Check back soon for updates!</p>
+                                    <div className="bg-white rounded-2xl premium-shadow border border-secondary-100 p-8">
+                                        <h3 className="text-2xl font-black text-secondary-900 mb-6 flex items-center gap-2">
+                                            <Settings className="w-6 h-6 text-primary-600" /> Store Settings
+                                        </h3>
+                                        <form onSubmit={handleUpdateSettings} className="max-w-xl space-y-6">
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-bold text-secondary-700 mb-2">Display Contact Name</label>
+                                                    <input
+                                                        type="text"
+                                                        value={settings.name || ''}
+                                                        onChange={(e) => setSettings({ ...settings, name: e.target.value })}
+                                                        className="w-full px-4 py-3 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 font-medium"
+                                                        placeholder="Your individual name"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-secondary-700 mb-2">Public Shop/Restaurant Name</label>
+                                                    <input
+                                                        type="text"
+                                                        value={settings.shopName || ''}
+                                                        onChange={(e) => setSettings({ ...settings, shopName: e.target.value })}
+                                                        className="w-full px-4 py-3 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 font-medium"
+                                                        placeholder="e.g. Biryani Hub"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="border-t border-secondary-100 pt-6">
+                                                <h4 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
+                                                    <IndianRupee className="w-5 h-5 text-green-600" /> Payment & UPI Options
+                                                </h4>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-secondary-700 mb-2">Merchant UPI ID</label>
+                                                    <p className="text-xs text-secondary-500 mb-3">Ensure your UPI ID is correct to directly receive payments from customers. (e.g. 9876543210@paytm)</p>
+                                                    <input
+                                                        type="text"
+                                                        value={settings.upiId || ''}
+                                                        onChange={(e) => setSettings({ ...settings, upiId: e.target.value })}
+                                                        className="w-full px-4 py-3 bg-green-50/50 border border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 font-bold tracking-wide"
+                                                        placeholder="vendor@bank"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="pt-4 flex gap-4">
+                                                <button type="submit" className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg hover:-translate-y-0.5" disabled={loading}>
+                                                    Save Configuration
+                                                </button>
+                                                <button type="button" onClick={generateQR} className="px-6 py-3 bg-secondary-100 hover:bg-secondary-200 text-secondary-800 font-bold rounded-xl flex items-center gap-2 transition-colors">
+                                                    <QrCode className="w-4 h-4" /> Download Base Store QR
+                                                </button>
+                                            </div>
+                                        </form>
                                     </div>
                                 )}
                             </div>

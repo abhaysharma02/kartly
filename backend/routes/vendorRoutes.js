@@ -40,4 +40,8 @@ router.post('/inventory', inventoryController.createInventoryItem);
 router.put('/inventory/:id', inventoryController.updateInventoryItem);
 router.delete('/inventory/:id', inventoryController.deleteInventoryItem);
 
+// Settings
+router.get('/settings', vendorController.getSettings);
+router.put('/settings', vendorController.updateSettings);
+
 module.exports = router;

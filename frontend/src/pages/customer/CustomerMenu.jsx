@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { IndianRupee, ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt, Trash2, ChefHat } from 'lucide-react';
+import { IndianRupee, ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt, Trash2, ChefHat, ScanLine } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 const CustomerMenu = () => {
     const { vendorId } = useParams();
@@ -151,7 +152,7 @@ const CustomerMenu = () => {
                 subtotal: cartTotal,
                 taxAmount: cartTotal * 0.05,
                 totalAmount: cartTotal * 1.05,
-                paymentMethod: paymentMethod,
+                paymentMethod: paymentMethod === 'SCAN_QR' ? 'UPI' : paymentMethod,
                 customerPhone: customerPhone,
                 customerName: customerName
             };
@@ -160,7 +161,7 @@ const CustomerMenu = () => {
             const { orderId, paymentMethod: returnedMethod } = res.data;
 
             // If Cash or UPI, we bypass Razorpay natively on the backend now.
-            if (returnedMethod === 'CASH' || returnedMethod === 'UPI') {
+            if (returnedMethod === 'CASH' || returnedMethod === 'UPI' || paymentMethod === 'SCAN_QR') {
                 setCart([]);
                 const recoveryData = { vendorId, orderId, time: new Date().getTime() };
                 localStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
@@ -293,7 +294,7 @@ const CustomerMenu = () => {
                 </div>
 
                 {/* Hero Banner Area */}
-                <div className="relative h-48 md:h-64 w-full bg-secondary-900 border-b-4 border-primary-500 shadow-md">
+                <div className="relative h-36 md:h-48 w-full bg-secondary-900 border-b-4 border-primary-500 shadow-md">
                     <img src={vendorDetails.coverImage || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1920&q=80'} alt="Restaurant Cover" className="w-full h-full object-cover opacity-60 mix-blend-overlay" />
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent p-4 pb-6 z-10">
                         <div className="max-w-2xl mx-auto flex justify-between items-end">
@@ -314,8 +315,8 @@ const CustomerMenu = () => {
                 </div>
 
                 {/* Vendor Info Section */}
-                <div className="max-w-2xl mx-auto px-4 py-5 bg-white shadow-sm rounded-b-3xl relative z-20 -mt-4 pb-6 border-x border-b border-secondary-100">
-                    <div className="flex gap-4 items-center mb-5 bg-secondary-50 px-4 py-3 rounded-2xl border border-secondary-200 shadow-inner">
+                <div className="max-w-2xl mx-auto px-4 py-3 bg-white shadow-sm rounded-b-3xl relative z-20 -mt-4 pb-4 border-x border-b border-secondary-100">
+                    <div className="flex gap-4 items-center mb-4 bg-secondary-50 px-4 py-2.5 rounded-2xl border border-secondary-200 shadow-inner">
                         <div className="flex gap-2 items-center text-sm font-black text-secondary-800 tracking-tight">
                             <Clock className="w-4.5 h-4.5 text-primary-600" />
                             <span>{vendorDetails.time}</span>
@@ -338,7 +339,7 @@ const CustomerMenu = () => {
                                 placeholder="Search for dishes..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-white border-2 border-secondary-100 text-secondary-900 text-sm rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 block w-full pl-11 p-3.5 font-bold transition-all outline-none shadow-sm placeholder:font-medium"
+                                className="bg-white border-2 border-secondary-100 text-secondary-900 text-sm rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 block w-full pl-11 p-3 font-bold transition-all outline-none shadow-sm placeholder:font-medium"
                             />
                         </div>
                         <div className="flex items-center">
@@ -355,41 +356,41 @@ const CustomerMenu = () => {
 
                 {/* Token Recovery Banner */}
                 {recoveryLink && (
-                    <div className="max-w-2xl mx-auto px-4 mt-4 animate-fade-in-up">
-                        <div className="bg-primary-50 border border-primary-200 rounded-2xl p-4 flex justify-between items-center premium-shadow">
+                    <div className="max-w-2xl mx-auto px-4 mt-3 animate-fade-in-up flex justify-center w-full z-10 relative">
+                        <div className="bg-primary-50 w-full border border-primary-200 rounded-2xl p-3 flex justify-between items-center premium-shadow">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
-                                    <Receipt className="w-5 h-5" />
+                                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
+                                    <Receipt className="w-4 h-4" />
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-secondary-900 text-sm">Active Order</h3>
                                     <p className="text-secondary-500 text-xs font-medium">View your live order status</p>
                                 </div>
                             </div>
-                            <button onClick={() => navigate(recoveryLink)} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-colors">
+                            <button onClick={() => navigate(recoveryLink)} className="bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm transition-colors">
                                 View Receipt
                             </button>
                         </div>
                     </div>
                 )}
-
-                {/* Sticky Categories */}
-                {!searchQuery && categories.length > 0 && (
-                    <div className="max-w-2xl mx-auto bg-white border-b border-secondary-100 shadow-sm overflow-x-auto no-scrollbar scroll-smooth">
-                        <div className="flex px-4 py-3 gap-3">
-                            {categories.map(cat => (
-                                <button
-                                    key={cat._id}
-                                    onClick={() => scrollToCategory(cat._id)}
-                                    className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all border ${activeCategory === cat._id ? 'bg-primary-600 text-white border-primary-600 premium-shadow' : 'bg-white text-secondary-600 border-secondary-200 hover:bg-secondary-50 hover:border-secondary-300'}`}
-                                >
-                                    {cat.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </header>
+
+            {/* Sticky Categories */}
+            {!searchQuery && categories.length > 0 && (
+                <div className="sticky top-[64px] z-40 max-w-2xl mx-auto bg-white/95 backdrop-blur-md border-b border-secondary-100 shadow-sm overflow-x-auto no-scrollbar scroll-smooth">
+                    <div className="flex px-4 py-3 gap-3">
+                        {categories.map(cat => (
+                            <button
+                                key={cat._id}
+                                onClick={() => scrollToCategory(cat._id)}
+                                className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all border ${activeCategory === cat._id ? 'bg-primary-600 text-white border-primary-600 premium-shadow' : 'bg-white text-secondary-600 border-secondary-200 hover:bg-secondary-50 hover:border-secondary-300'}`}
+                            >
+                                {cat.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Main Content */}
             <main className="max-w-2xl mx-auto px-4 py-6">
@@ -562,6 +563,14 @@ const CustomerMenu = () => {
                                         </div>
                                     </label>
 
+                                    <label className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-all ${paymentMethod === 'SCAN_QR' ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-500/20' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}>
+                                        <input type="radio" name="paymentMethod" value="SCAN_QR" checked={paymentMethod === 'SCAN_QR'} onChange={() => setPaymentMethod('SCAN_QR')} className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-secondary-300" />
+                                        <div className="ml-3 flex-1 flex justify-between items-center">
+                                            <span className="font-bold text-secondary-900">Scan QR Code</span>
+                                            <span className="flex items-center gap-1 text-xs font-bold bg-secondary-100 text-secondary-600 px-2 py-0.5 rounded border border-secondary-200"><ScanLine className="w-3 h-3" /> 2 Devices</span>
+                                        </div>
+                                    </label>
+
                                     <label className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-all ${paymentMethod === 'CASH' ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500/20' : 'border-secondary-200 bg-white hover:bg-secondary-50'}`}>
                                         <input type="radio" name="paymentMethod" value="CASH" checked={paymentMethod === 'CASH'} onChange={() => setPaymentMethod('CASH')} className="w-5 h-5 text-primary-600 focus:ring-primary-500 border-secondary-300" />
                                         <div className="ml-3">
@@ -572,7 +581,7 @@ const CustomerMenu = () => {
 
                                 <button
                                     onClick={(e) => {
-                                        if (paymentMethod === 'UPI') setCheckoutStep('UPI_INTENT');
+                                        if (paymentMethod === 'UPI' || paymentMethod === 'SCAN_QR') setCheckoutStep('UPI_INTENT');
                                         else handleCheckout(e);
                                     }}
                                     disabled={isCheckingOut}
@@ -587,22 +596,39 @@ const CustomerMenu = () => {
                         {/* STEP 3: UPI INTENT */}
                         {checkoutStep === 'UPI_INTENT' && (
                             <div className="flex flex-col items-center py-4 space-y-5 animate-fade-in text-center">
-                                <div className="w-20 h-20 bg-success-50 rounded-full flex items-center justify-center border-4 border-success-100 shadow-inner mb-2">
-                                    <span className="text-3xl font-black text-success-600">₹</span>
-                                </div>
+                                {paymentMethod === 'SCAN_QR' ? (
+                                    <div className="bg-white p-4 rounded-3xl border-2 border-dashed border-secondary-200 mb-2 pointer-events-none premium-shadow">
+                                        <QRCodeSVG
+                                            value={`upi://pay?pa=${vendorDetails.upiId}&pn=${vendorDetails.businessName}&am=${(cartTotal * 1.05).toFixed(2)}&cu=INR`}
+                                            size={200}
+                                            level={"H"}
+                                            includeMargin={false}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="w-20 h-20 bg-success-50 rounded-full flex items-center justify-center border-4 border-success-100 shadow-inner mb-2">
+                                        <span className="text-3xl font-black text-success-600">₹</span>
+                                    </div>
+                                )}
                                 <div>
-                                    <h3 className="text-2xl font-black text-secondary-900">Complete Payment</h3>
+                                    <h3 className="text-2xl font-black text-secondary-900">{paymentMethod === 'SCAN_QR' ? 'Scan to Pay' : 'Complete Payment'}</h3>
                                     <p className="text-secondary-500 font-medium text-sm mt-1 max-w-[250px] mx-auto">
-                                        Tap below to safely open your UPI App and pay <span className="text-secondary-900 font-bold">₹{(cartTotal * 1.05).toFixed(2)}</span>
+                                        {paymentMethod === 'SCAN_QR'
+                                            ? <span>Scan heavily guarded QR with your UPI App to pay <span className="text-secondary-900 font-bold tracking-tight">₹{(cartTotal * 1.05).toFixed(2)}</span></span>
+                                            : <span>Tap below to safely open your UPI App and pay <span className="text-secondary-900 font-bold tracking-tight">₹{(cartTotal * 1.05).toFixed(2)}</span></span>
+                                        }
                                     </p>
+                                    {paymentMethod === 'SCAN_QR' && <p className="text-xs font-bold text-secondary-400 mt-2 tracking-widest uppercase">{vendorDetails.businessName}</p>}
                                 </div>
 
-                                <a
-                                    href={`upi://pay?pa=${vendorDetails.upiId}&pn=${vendorDetails.businessName}&am=${(cartTotal * 1.05).toFixed(2)}&cu=INR`}
-                                    className="w-full bg-success-600 text-white font-black py-4 rounded-xl text-lg hover:bg-success-700 transition-colors shadow-lg shadow-success-600/30 flex justify-center items-center mt-4"
-                                >
-                                    Pay via UPI App
-                                </a>
+                                {paymentMethod === 'UPI' && (
+                                    <a
+                                        href={`upi://pay?pa=${vendorDetails.upiId}&pn=${vendorDetails.businessName}&am=${(cartTotal * 1.05).toFixed(2)}&cu=INR`}
+                                        className="w-full bg-success-600 text-white font-black py-4 rounded-xl text-lg hover:bg-success-700 transition-colors shadow-lg shadow-success-600/30 flex justify-center items-center mt-4"
+                                    >
+                                        Pay via UPI App
+                                    </a>
+                                )}
 
                                 <div className="w-full relative py-2">
                                     <div className="absolute inset-x-0 top-1/2 h-px bg-secondary-200"></div>
@@ -616,6 +642,13 @@ const CustomerMenu = () => {
                                 >
                                     {isCheckingOut ? 'Confirming...' : 'I Have Paid'}
                                 </button>
+                            </div>
+                        )}
+
+                        {error && (
+                            <div className="mt-4 bg-danger-50 border border-danger-200 text-danger-700 px-4 py-3 rounded-xl flex items-start gap-3 animate-fade-in">
+                                <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                <span className="font-bold text-sm leading-tight">{error}</span>
                             </div>
                         )}
 

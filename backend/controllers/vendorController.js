@@ -158,7 +158,7 @@ exports.getOrders = async (req, res) => {
 
         const orders = await Order.find({
             vendorId,
-            paymentStatus: 'SUCCESS',
+            paymentStatus: { $in: ['SUCCESS', 'PAID', 'CASH_PENDING'] },
             $or: [
                 { orderStatus: { $in: ['Pending', 'Preparing', 'Ready'] } },
                 { createdAt: { $gte: startOfDay } }
@@ -226,5 +226,31 @@ exports.renewSubscription = async (req, res) => {
     } catch (error) {
         console.error('Renew subscription error:', error);
         res.status(500).json({ error: 'Failed to initiate subscription renewal' });
+    }
+};
+
+exports.getSettings = async (req, res) => {
+    try {
+        const vendor = await Vendor.findById(req.vendorId).select('name shopName email phone upiId status');
+        res.json({ success: true, settings: vendor });
+    } catch (error) {
+        console.error('Get settings error:', error);
+        res.status(500).json({ error: 'Server error fetching settings' });
+    }
+};
+
+exports.updateSettings = async (req, res) => {
+    try {
+        const { shopName, name, upiId } = req.body;
+        const vendor = await Vendor.findByIdAndUpdate(
+            req.vendorId,
+            { $set: { shopName, name, upiId } },
+            { new: true, runValidators: true }
+        ).select('name shopName email phone upiId status');
+        
+        res.json({ success: true, settings: vendor });
+    } catch (error) {
+        console.error('Update settings error:', error);
+        res.status(500).json({ error: 'Server error updating settings' });
     }
 };
