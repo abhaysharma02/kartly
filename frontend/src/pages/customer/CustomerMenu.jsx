@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import { IndianRupee, ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt, Trash2 } from 'lucide-react';
+import { IndianRupee, ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt, Trash2, ChefHat } from 'lucide-react';
 
 const CustomerMenu = () => {
     const { vendorId } = useParams();
