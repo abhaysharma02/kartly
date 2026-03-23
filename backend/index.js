@@ -13,6 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const vendorRoutes = require('./routes/vendorRoutes');
 const publicRoutes = require('./routes/publicRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -48,6 +49,7 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 // Routes
+app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/public', publicRoutes);

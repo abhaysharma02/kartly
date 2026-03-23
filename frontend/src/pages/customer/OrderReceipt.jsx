@@ -47,7 +47,20 @@ const OrderReceipt = () => {
             }
         });
 
+        // Polling fallback every 10 seconds
+        const pollInterval = setInterval(async () => {
+            try {
+                const res = await api.get(`/public/orders/${orderId}`);
+                if (res.data?.order?.orderStatus) {
+                    setOrder(prev => prev ? { ...prev, orderStatus: res.data.order.orderStatus } : prev);
+                }
+            } catch (err) {
+                console.error('Polling error:', err);
+            }
+        }, 10000);
+
         return () => {
+            clearInterval(pollInterval);
             socket.disconnect();
         };
     }, [orderId]);
@@ -79,25 +92,19 @@ const OrderReceipt = () => {
     const isPreparing = order.orderStatus === 'Preparing';
     const isReady = order.orderStatus === 'Ready';
     const isCompleted = order.orderStatus === 'Completed';
-    const isDone = isReady || isCompleted;
 
     const getStatusIcon = () => {
         if (isPreparing) return <ChefHat className="w-12 h-12 text-primary-500" />;
-        if (isDone) return <Bell className="w-12 h-12 text-success-500" />;
+        if (isReady) return <Bell className="w-12 h-12 text-success-500" />;
+        if (isCompleted) return <CheckCircle2 className="w-12 h-12 text-success-500" />;
         return <CheckCircle2 className="w-12 h-12 text-warning-500" />;
     };
 
     const getStatusText = () => {
         if (isPreparing) return 'Your food is being prepared';
         if (isReady) return 'Your food is ready for pickup!';
-        if (isCompleted) return 'Order Completed';
-        return 'Order Received, waiting for confirmation';
-    };
-
-    const getStatusColor = () => {
-        if (isPreparing) return 'text-primary-600 bg-primary-50 border-primary-100';
-        if (isDone) return 'text-success-600 bg-success-50 border-success-100';
-        return 'text-warning-600 bg-warning-50 border-warning-100';
+        if (isCompleted) return 'Order Collected';
+        return 'Order Paid, waiting for confirmation';
     };
 
     return (
@@ -117,7 +124,7 @@ const OrderReceipt = () => {
                 <div className="bg-white rounded-3xl premium-shadow border border-secondary-100 p-8 text-center relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary-400 via-primary-500 to-primary-600"></div>
 
-                    <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-6 shadow-inner border-4 border-white ${isPreparing ? 'bg-primary-50' : isDone ? 'bg-success-50' : 'bg-warning-50'}`}>
+                    <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-6 shadow-inner border-4 border-white ${isPreparing ? 'bg-primary-50' : (isReady || isCompleted) ? 'bg-success-50' : 'bg-warning-50'}`}>
                         {getStatusIcon()}
                     </div>
 
@@ -128,30 +135,37 @@ const OrderReceipt = () => {
                     </div>
 
                     {/* Progress Steps */}
-                    <div className="flex justify-between items-center max-w-xs mx-auto relative px-2 mb-2">
-                        <div className="absolute left-[10%] top-1/2 transform -translate-y-1/2 w-[80%] h-1 bg-secondary-100 -z-10 rounded-full"></div>
+                    <div className="flex justify-between items-center max-w-sm mx-auto relative px-2 mb-2">
+                        <div className="absolute left-[5%] top-1/2 transform -translate-y-1/2 w-[90%] h-1 bg-secondary-100 -z-10 rounded-full"></div>
 
-                        <div className={`absolute left-[10%] top-1/2 transform -translate-y-1/2 h-1 rounded-full transition-all duration-500 -z-10 ${isPending ? 'w-0' : isPreparing ? 'w-[45%] bg-primary-500' : 'w-[80%] bg-success-500'}`}></div>
+                        <div className={`absolute left-[5%] top-1/2 transform -translate-y-1/2 h-1 rounded-full transition-all duration-500 -z-10 bg-success-500 ${isPending ? 'w-0' : isPreparing ? 'w-[33%]' : isReady ? 'w-[66%]' : 'w-[90%]'}`}></div>
 
                         <div className="flex flex-col items-center gap-2 bg-white px-1">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isPending ? 'bg-warning-500 text-white ring-4 ring-warning-50' : 'bg-success-500 text-white'}`}>
                                 <CheckCircle2 className="w-4 h-4" />
                             </div>
-                            <span className="text-[10px] font-bold text-secondary-500 uppercase tracking-widest">Received</span>
+                            <span className="text-[10px] font-bold text-secondary-900 uppercase tracking-widest">PAID</span>
                         </div>
 
                         <div className="flex flex-col items-center gap-2 bg-white px-1">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors delay-100 ${isPreparing ? 'bg-primary-500 text-white ring-4 ring-primary-50' : isDone ? 'bg-success-500 text-white' : 'bg-secondary-200 text-transparent'}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors delay-100 ${isPreparing ? 'bg-primary-500 text-white ring-4 ring-primary-50' : (isReady || isCompleted) ? 'bg-success-500 text-white' : 'bg-secondary-200 text-transparent'}`}>
                                 <ChefHat className="w-3 h-3" />
                             </div>
-                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors delay-100 ${isPreparing || isDone ? 'text-secondary-900' : 'text-secondary-400'}`}>Preparing</span>
+                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors delay-100 ${isPreparing || isReady || isCompleted ? 'text-secondary-900' : 'text-secondary-400'}`}>Preparing</span>
                         </div>
 
                         <div className="flex flex-col items-center gap-2 bg-white px-1">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors delay-200 ${isDone ? 'bg-success-500 text-white ring-4 ring-success-50 shadow-lg shadow-success-500/40' : 'bg-secondary-200 text-transparent'}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors delay-200 ${isReady ? 'bg-primary-500 text-white ring-4 ring-primary-50 shadow-lg' : isCompleted ? 'bg-success-500 text-white' : 'bg-secondary-200 text-transparent'}`}>
                                 <Bell className="w-3 h-3" />
                             </div>
-                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors delay-200 ${isDone ? 'text-success-600' : 'text-secondary-400'}`}>Ready</span>
+                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors delay-200 ${isReady || isCompleted ? 'text-secondary-900' : 'text-secondary-400'}`}>Ready</span>
+                        </div>
+                        
+                        <div className="flex flex-col items-center gap-2 bg-white px-1">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors delay-300 ${isCompleted ? 'bg-success-500 text-white ring-4 ring-success-50 shadow-lg' : 'bg-secondary-200 text-transparent'}`}>
+                                <CheckCircle2 className="w-3 h-3" />
+                            </div>
+                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors delay-300 ${isCompleted ? 'text-success-600' : 'text-secondary-400'}`}>Collected</span>
                         </div>
                     </div>
                 </div>

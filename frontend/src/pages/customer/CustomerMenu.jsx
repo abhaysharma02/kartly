@@ -73,18 +73,47 @@ const CustomerMenu = () => {
 
         fetchMenu();
 
-        // Option A (Token Recovery): Check localStorage
-        try {
-            const data = localStorage.getItem(`kartly_last_order_${vendorId}`);
-            if (data) {
-                const parsed = JSON.parse(data);
-                // Simple 1-hour expiry on local recovery link just so it goes away eventually 
-                if (new Date().getTime() - parsed.time < 3600000) {
-                    setRecoveryLink(`/q/${vendorId}/receipt/${parsed.orderId}`);
+        // Option A (Token Recovery): Check URL, then sessionStorage, then localStorage
+        const checkRecovery = async () => {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                let recoveredOrderId = urlParams.get('orderId');
+                
+                if (!recoveredOrderId) {
+                    const sessionData = sessionStorage.getItem(`kartly_last_order_${vendorId}`);
+                    if (sessionData) recoveredOrderId = JSON.parse(sessionData).orderId;
                 }
+                
+                if (!recoveredOrderId) {
+                    const localData = localStorage.getItem(`kartly_last_order_${vendorId}`);
+                    if (localData) {
+                        const parsed = JSON.parse(localData);
+                        if (new Date().getTime() - parsed.time < 3600000 * 2) {
+                            recoveredOrderId = parsed.orderId;
+                        }
+                    }
+                }
+                
+                if (recoveredOrderId) {
+                    const res = await api.get(`/public/orders/${recoveredOrderId}`);
+                    const orderStatus = res.data?.order?.orderStatus;
+                    const pStatus = res.data?.order?.paymentStatus;
+                    
+                    if (pStatus === 'PAID' || pStatus === 'SUCCESS' || pStatus === 'CASH_PENDING') {
+                        if (['Pending', 'Preparing', 'Ready'].includes(orderStatus)) {
+                            navigate(`/q/${vendorId}/receipt/${recoveredOrderId}?orderId=${recoveredOrderId}`);
+                            return;
+                        }
+                    }
+                    setRecoveryLink(`/q/${vendorId}/receipt/${recoveredOrderId}?orderId=${recoveredOrderId}`);
+                }
+            } catch (e) { 
+                console.error("Token recovery check failed", e);
             }
-        } catch (e) { /* ignore */ }
-    }, [vendorId]);
+        };
+
+        checkRecovery();
+    }, [vendorId, navigate]);
 
     const addToCart = (item) => {
         setCart(prev => {
@@ -165,7 +194,8 @@ const CustomerMenu = () => {
                 setCart([]);
                 const recoveryData = { vendorId, orderId, time: new Date().getTime() };
                 localStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
-                navigate(`/q/${vendorId}/receipt/${orderId}`);
+                sessionStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
+                navigate(`/q/${vendorId}/receipt/${orderId}?orderId=${orderId}`);
                 return;
             }
 
@@ -174,8 +204,9 @@ const CustomerMenu = () => {
             // Option A (Token Recovery): Store the last successful order
             const recoveryData = { vendorId, orderId, time: new Date().getTime() };
             localStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
+            sessionStorage.setItem(`kartly_last_order_${vendorId}`, JSON.stringify(recoveryData));
 
-            navigate(`/q/${vendorId}/receipt/${orderId}`);
+            navigate(`/q/${vendorId}/receipt/${orderId}?orderId=${orderId}`);
         } catch (err) {
             if (err.response?.status === 403) {
                 setError('This vendor is not currently accepting orders.');

@@ -190,7 +190,47 @@ const Dashboard = () => {
             setError(null);
             const res = await api.get('/vendor/qr');
             const fullUrl = `${window.location.origin}${res.data.qrPath}`;
-            setQrData(fullUrl);
+            
+            // Task 4: QR PNG blob download natively
+            const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(fullUrl)}&margin=10`;
+            const response = await fetch(qrApiUrl);
+            const blob = await response.blob();
+            
+            const objectUrl = URL.createObjectURL(blob);
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1200;
+                canvas.height = 1200;
+                const ctx = canvas.getContext('2d');
+                
+                // Render white background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, 1200, 1200);
+                
+                // Render the fetched QR blob in the center
+                ctx.drawImage(img, 100, 100, 1000, 1000);
+                
+                // Trigger download
+                canvas.toBlob((finalBlob) => {
+                    const downloadUrl = URL.createObjectURL(finalBlob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `kartly-qr-${user.vendorId}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // Cleanup
+                    URL.revokeObjectURL(objectUrl);
+                    URL.revokeObjectURL(downloadUrl);
+                }, 'image/png');
+                
+                alert('QR Code Downloaded Successfully!');
+            };
+            img.src = objectUrl;
+            
         } catch (err) {
             console.error("QR Generation Failed:", err);
             setError(err.response?.data?.error || 'Failed to generate QR Code. Make sure you have an active subscription, category, and menu item.');
