@@ -93,11 +93,13 @@ exports.updateOrderStatus = async (req, res) => {
             return res.status(404).json({ error: 'Order not found' });
         }
 
+        const io = req.app.get('io');
+
         // Trigger Business Logic: Revert Stock on Cancellation
         if (status === 'Cancelled') {
             try {
                 const { revertStock } = require('./inventoryController');
-                await revertStock(vendorId, order.items);
+                await revertStock(vendorId, order.items, io);
                 console.log(`[Inventory] Reverted stock for cancelled Order ${order._id}`);
             } catch (inventoryErr) {
                 console.error('[Inventory Error] Failed to revert stock:', inventoryErr);
@@ -105,7 +107,6 @@ exports.updateOrderStatus = async (req, res) => {
         }
 
         // Emit Socket.io event to the customer's room (using order ID as room name for customers)
-        const io = req.app.get('io');
         if (io) {
             io.to(`order_${order._id.toString()}`).emit('order_status_update', {
                 orderId: order._id,
@@ -177,7 +178,15 @@ exports.getSubscription = async (req, res) => {
         const vendorId = req.vendorId;
         const subscription = await Subscription.findOne({ vendorId }).populate('planId');
 
-        res.json({ success: true, subscription });
+        const Vendor = require('../models/Vendor');
+        const vendor = await Vendor.findById(vendorId);
+        
+        const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
+        const msSinceCreation = new Date() - new Date(vendor.createdAt);
+        const trialDaysLeft = Math.max(0, Math.ceil((fourteenDaysMs - msSinceCreation) / (1000 * 60 * 60 * 24)));
+        const isTrial = msSinceCreation < fourteenDaysMs;
+
+        res.json({ success: true, subscription, trialDaysLeft, isTrial });
     } catch (error) {
         console.error('Fetch subscription error:', error);
         res.status(500).json({ error: 'Server error fetching subscription' });
@@ -231,7 +240,7 @@ exports.renewSubscription = async (req, res) => {
 
 exports.getSettings = async (req, res) => {
     try {
-        const vendor = await Vendor.findById(req.vendorId).select('name shopName email phone upiId status');
+        const vendor = await Vendor.findById(req.vendorId).select('name shopName email phone upiId status completedOnboarding vendorWhatsApp whatsappEnabled');
         res.json({ success: true, settings: vendor });
     } catch (error) {
         console.error('Get settings error:', error);
@@ -241,16 +250,143 @@ exports.getSettings = async (req, res) => {
 
 exports.updateSettings = async (req, res) => {
     try {
-        const { shopName, name, upiId } = req.body;
+        const { shopName, name, upiId, tables, vendorWhatsApp, whatsappEnabled } = req.body;
+        const updateFields = { shopName, name, upiId };
+        if (tables !== undefined) updateFields.tables = tables;
+        if (vendorWhatsApp !== undefined) updateFields.vendorWhatsApp = vendorWhatsApp;
+        if (whatsappEnabled !== undefined) updateFields.whatsappEnabled = whatsappEnabled;
+
         const vendor = await Vendor.findByIdAndUpdate(
             req.vendorId,
-            { $set: { shopName, name, upiId } },
+            { $set: updateFields },
             { new: true, runValidators: true }
-        ).select('name shopName email phone upiId status');
+        ).select('name shopName email phone upiId status tables vendorWhatsApp whatsappEnabled');
         
         res.json({ success: true, settings: vendor });
     } catch (error) {
         console.error('Update settings error:', error);
         res.status(500).json({ error: 'Server error updating settings' });
+    }
+};
+
+exports.completeOnboarding = async (req, res) => {
+    try {
+        const vendor = await Vendor.findByIdAndUpdate(
+            req.vendorId,
+            { $set: { completedOnboarding: true } },
+            { new: true }
+        );
+        res.json({ success: true, completedOnboarding: vendor.completedOnboarding });
+    } catch (error) {
+        console.error('Complete onboarding error:', error);
+        res.status(500).json({ error: 'Server error completing onboarding' });
+    }
+};
+
+exports.testWhatsApp = async (req, res) => {
+    try {
+        const vendor = await Vendor.findById(req.vendorId);
+        if (!vendor || !vendor.vendorWhatsApp) {
+            return res.status(400).json({ error: 'Please save a valid WhatsApp number first.' });
+        }
+
+        const { sendWhatsAppMessage } = require('../utils/whatsapp');
+        const success = await sendWhatsAppMessage(
+            vendor.vendorWhatsApp, 
+            `🔔 Test Message from Kartly! If you can read this, your WhatsApp integrations are fully hooked up.`
+        );
+
+        if (success) {
+            res.json({ success: true, message: 'Test message triggered successfully.' });
+        } else {
+            res.status(500).json({ error: 'Failed to send WhatsApp message. Check logs.' });
+        }
+    } catch (error) {
+        console.error('WhatsApp Test error:', error);
+        res.status(500).json({ error: 'Server error testing WhatsApp' });
+    }
+};
+
+exports.patchTables = async (req, res) => {
+    try {
+        const { tables } = req.body;
+        const vendor = await Vendor.findByIdAndUpdate(
+            req.vendorId,
+            { $set: { tables } },
+            { new: true, runValidators: true }
+        ).select('tables');
+        
+        res.json({ success: true, tables: vendor.tables });
+    } catch (error) {
+        console.error('Patch tables error:', error);
+        res.status(500).json({ error: 'Server error updating tables configuration' });
+    }
+};
+
+exports.getDailyReport = async (req, res) => {
+    try {
+        const { date } = req.query; // YYYY-MM-DD
+        const targetDate = date ? new Date(date) : new Date();
+        targetDate.setHours(0, 0, 0, 0);
+        
+        const nextDate = new Date(targetDate);
+        nextDate.setDate(targetDate.getDate() + 1);
+
+        const Order = require('../models/Order');
+        
+        // Find orders for the vendor on that date, excluding Cancelled
+        const orders = await Order.find({
+            vendorId: req.vendorId,
+            createdAt: { $gte: targetDate, $lt: nextDate },
+            orderStatus: { $ne: 'Cancelled' }
+        }).populate('items.menuItemId');
+
+        let totalRevenue = 0;
+        let totalOrders = orders.length;
+        let byPaymentMethod = { upi: 0, cash: 0 };
+        const hourlyMap = {};
+        const itemMap = {};
+
+        orders.forEach(order => {
+            totalRevenue += order.totalAmount;
+            
+            // Payment method split (UPI includes scan_qr historically)
+            if (order.paymentMethod === 'CASH') byPaymentMethod.cash++;
+            else byPaymentMethod.upi++;
+
+            // Hourly breakdown
+            const hour = new Date(order.createdAt).getHours();
+            if (!hourlyMap[hour]) hourlyMap[hour] = { hour, revenue: 0, orders: 0 };
+            hourlyMap[hour].revenue += order.totalAmount;
+            hourlyMap[hour].orders += 1;
+
+            // Item frequency
+            order.items.forEach(item => {
+                if (!itemMap[item.name]) itemMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
+                itemMap[item.name].qty += item.quantity;
+                itemMap[item.name].revenue += item.totalPrice;
+            });
+        });
+
+        const avgOrderValue = totalOrders > 0 ? (totalRevenue / totalOrders) : 0;
+        
+        const byHour = Object.values(hourlyMap).sort((a, b) => a.hour - b.hour);
+        const topItems = Object.values(itemMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
+
+        res.json({
+            success: true,
+            report: {
+                totalRevenue,
+                totalOrders,
+                avgOrderValue,
+                byPaymentMethod,
+                byHour,
+                topItems
+            }
+        });
+
+    } catch (error) {
+        console.error('Daily Report generation error:', error);
+        res.status(500).json({ error: 'Server error generating daily report' });
     }
 };

@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import { IndianRupee, ChevronLeft, Search, Share2, Star, Clock, Info, ShoppingBag, X, Receipt, Trash2, ChefHat, ScanLine } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { io } from 'socket.io-client';
+
+const SOCKET_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
 
 const CustomerMenu = () => {
     const { vendorId } = useParams();
@@ -17,11 +20,14 @@ const CustomerMenu = () => {
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [storeUnavailable, setStoreUnavailable] = useState(false);
 
     // Checkout States
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
-    const [checkoutStep, setCheckoutStep] = useState('CART'); // 'CART' | 'PAYMENT' | 'UPI_INTENT'
+    const [checkoutStep, setCheckoutStep] = useState('CART'); // 'CART' | 'TABLES' | 'PAYMENT' | 'UPI_INTENT'
+    const [vendorTables, setVendorTables] = useState([]);
+    const [selectedTable, setSelectedTable] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('UPI');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerName, setCustomerName] = useState('');
@@ -47,10 +53,11 @@ const CustomerMenu = () => {
         const fetchMenu = async () => {
             try {
                 setLoading(true);
-                const [catsRes, itemsRes, infoRes] = await Promise.all([
+                const [catsRes, itemsRes, infoRes, tablesRes] = await Promise.all([
                     api.get(`/public/${vendorId}/categories`),
                     api.get(`/public/${vendorId}/menu-items`),
-                    api.get(`/public/${vendorId}/info`).catch(err => ({ data: null }))
+                    api.get(`/public/${vendorId}/info`).catch(err => ({ data: null })),
+                    api.get(`/store/${vendorId}/tables`).catch(err => ({ data: { tableList: [] } }))
                 ]);
 
                 const activeCats = catsRes.data.filter(c => c.isActive);
@@ -61,11 +68,19 @@ const CustomerMenu = () => {
                     setVendorDetails(prev => ({ ...prev, ...infoRes.data }));
                 }
 
+                if (tablesRes.data && tablesRes.data.tableList) {
+                    setVendorTables(tablesRes.data.tableList);
+                }
+
                 if (activeCats.length > 0) {
                     setActiveCategory(activeCats[0]._id);
                 }
             } catch (err) {
-                setError(err.response?.data?.error || 'Failed to load menu. Store may be inactive at the moment.');
+                if (err.response && err.response.status === 402) {
+                    setStoreUnavailable(true);
+                } else {
+                    setError(err.response?.data?.error || 'Failed to load menu. Store may be inactive at the moment.');
+                }
             } finally {
                 setLoading(false);
             }
@@ -113,6 +128,19 @@ const CustomerMenu = () => {
         };
 
         checkRecovery();
+        
+        // Inventory Stock depletion listener
+        const socket = io(SOCKET_URL);
+        socket.on('connect', () => {
+            socket.emit('join_room', { vendorId: vendorId });
+        });
+        
+        socket.on('menu_updated', () => {
+            // Hot refresh the menu quietly
+            fetchMenu();
+        });
+
+        return () => socket.disconnect();
     }, [vendorId, navigate]);
 
     const addToCart = (item) => {
@@ -183,7 +211,8 @@ const CustomerMenu = () => {
                 totalAmount: cartTotal * 1.05,
                 paymentMethod: paymentMethod === 'SCAN_QR' ? 'UPI' : paymentMethod,
                 customerPhone: customerPhone,
-                customerName: customerName
+                customerName: customerName,
+                tableNumber: selectedTable || undefined
             };
 
             const res = await api.post(`/public/${vendorId}/order`, orderPayload);
@@ -238,6 +267,28 @@ const CustomerMenu = () => {
         );
     }
 
+    if (storeUnavailable) {
+        return (
+            <div className="min-h-screen bg-secondary-50 flex items-center justify-center p-4 font-sans text-secondary-900 pb-20">
+                <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full text-center border mt-8 border-secondary-100 flex flex-col items-center">
+                    <div className="w-20 h-20 bg-secondary-100 rounded-full flex items-center justify-center mb-6">
+                        <Store className="w-10 h-10 text-secondary-400" />
+                    </div>
+                    <h2 className="text-2xl font-black text-secondary-900 mb-2">Store Unavailable</h2>
+                    <p className="text-secondary-500 font-medium mb-8 leading-relaxed">
+                        This store is temporarily unavailable and not accepting orders at the moment. Please check back later.
+                    </p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="w-full py-4 px-6 bg-secondary-900 text-white rounded-2xl font-bold hover:bg-black transition-colors"
+                    >
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     if (error && !loading && !categories.length) {
         return (
             <div className="min-h-screen bg-secondary-50 flex justify-center items-center p-4">
@@ -275,7 +326,7 @@ const CustomerMenu = () => {
                             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
                         ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center text-secondary-400 bg-secondary-50">
-                                <ShoppingBag className="w-8 h-8 opacity-20 mb-2" />
+                                <span className="text-4xl font-black text-secondary-300 uppercase">{item.name.charAt(0)}</span>
                             </div>
                         )}
                     </div>
@@ -563,11 +614,38 @@ const CustomerMenu = () => {
                                 </div>
 
                                 <button
-                                    onClick={() => setCheckoutStep('PAYMENT')}
+                                    onClick={() => setCheckoutStep(vendorTables.length > 0 ? 'TABLES' : 'PAYMENT')}
                                     disabled={cart.length === 0}
                                     className="w-full bg-primary-600 text-white font-black py-4 rounded-xl text-lg hover:bg-primary-700 active:bg-primary-800 transition-colors shadow-lg shadow-primary-500/30 flex justify-center items-center gap-2 disabled:opacity-70"
                                 >
                                     Proceed to Checkout
+                                </button>
+                            </>
+                        )}
+
+                        {/* STEP 1.5: TABLES */}
+                        {checkoutStep === 'TABLES' && (
+                            <>
+                                <div className="mb-6 space-y-3">
+                                    <h3 className="font-bold text-secondary-900 mb-2">Where are you seated?</h3>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {vendorTables.map(t => (
+                                            <button
+                                                key={t}
+                                                onClick={() => setSelectedTable(t)}
+                                                className={`p-4 rounded-2xl font-black text-lg transition-all border-2 flex items-center justify-center ${selectedTable === t ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-md scale-105' : 'border-secondary-100 bg-white text-secondary-600 hover:bg-secondary-50 hover:border-secondary-300'}`}
+                                            >
+                                                {t}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setCheckoutStep('PAYMENT')}
+                                    disabled={!selectedTable}
+                                    className="w-full bg-primary-600 text-white font-black py-4 rounded-xl text-lg hover:bg-primary-700 active:bg-primary-800 transition-colors shadow-lg shadow-primary-500/30 flex justify-center items-center gap-2 disabled:opacity-70"
+                                >
+                                    Continue
                                 </button>
                             </>
                         )}

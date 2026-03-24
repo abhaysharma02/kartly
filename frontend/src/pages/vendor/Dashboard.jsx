@@ -16,12 +16,13 @@ import {
     X,
     Bell,
     ChefHat,
-    TrendingUp,
     Store,
     PackageOpen,
     Trash2,
-    IndianRupee
+    IndianRupee,
+    MessageSquare
 } from 'lucide-react';
+import OnboardingWizard from './OnboardingWizard';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
 
@@ -37,12 +38,19 @@ const Dashboard = () => {
     const [orders, setOrders] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [subscription, setSubscription] = useState(null);
+    const [isTrial, setIsTrial] = useState(false);
+    const [trialDays, setTrialDays] = useState(0);
     const [inventoryItems, setInventoryItems] = useState([]);
     const [settings, setSettings] = useState({ shopName: '', name: '', upiId: '' });
 
     // UI States
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // Reports States
+    const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+    const [dailyReport, setDailyReport] = useState(null);
+    const [reportLoading, setReportLoading] = useState(false);
 
     // Form States
     const [newCatName, setNewCatName] = useState('');
@@ -77,6 +85,8 @@ const Dashboard = () => {
             setMenuItems(Array.isArray(itemsData) ? itemsData : []);
             setCustomers(custData.customers || []);
             setSubscription(subData.subscription || null);
+            setIsTrial(subData.isTrial || false);
+            setTrialDays(subData.trialDaysLeft || 0);
             setInventoryItems(Array.isArray(invData) ? invData : []);
             setOrders(ordersData.orders || []);
             setSettings(settingsData.settings || { shopName: '', name: '', upiId: '' });
@@ -147,6 +157,32 @@ const Dashboard = () => {
             fetchData();
         } catch (err) {
             setError('Failed to create menu item');
+        }
+    };
+
+    const handleImageUpload = async (itemId, file) => {
+        if (!file) return;
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+            const res = await api.post(`/vendor/menu-items/${itemId}/image`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            if (res.data.success) {
+                setMenuItems(menuItems.map(i => i._id === itemId ? { ...i, imageUrl: res.data.imageUrl } : i));
+            }
+        } catch (err) {
+            alert('Image upload failed');
+        }
+    };
+
+    const handleDeleteItem = async (itemId) => {
+        if (!window.confirm('Delete this menu item completely?')) return;
+        try {
+            await api.delete(`/vendor/menu-items/${itemId}`);
+            setMenuItems(menuItems.filter(i => i._id !== itemId));
+        } catch (err) {
+            alert('Failed to delete item.');
         }
     };
 
@@ -284,8 +320,20 @@ const Dashboard = () => {
         }
     };
 
+    const handleTestWhatsApp = async () => {
+        try {
+            // Ensure settings are saved first before triggering backend test
+            await api.put('/vendor/settings', settings);
+            const res = await api.post('/vendor/settings/whatsapp-test');
+            alert(res.data.message || 'Test message sent!');
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to send WhatsApp test message. Please ensure the number is valid.');
+        }
+    };
+
     const navItems = [
         { id: 'dashboard_home', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'reports', label: 'Day-End Reports', icon: TrendingUp },
         { id: 'orders', label: 'Live Orders', icon: ChefHat, badge: orders.filter(o => o.orderStatus === 'Pending').length },
         { id: 'menu', label: 'Menu Items', icon: UtensilsCrossed },
         { id: 'categories', label: 'Categories', icon: ClipboardList },
@@ -295,6 +343,10 @@ const Dashboard = () => {
         { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
         { id: 'settings', label: 'Settings', icon: Settings },
     ];
+
+    if (!loading && settings && settings.completedOnboarding === false) {
+        return <OnboardingWizard vendorId={user.vendorId} onComplete={() => fetchData()} />;
+    }
 
     return (
         <div className="min-h-screen bg-secondary-50 flex">
@@ -402,6 +454,24 @@ const Dashboard = () => {
                     </div>
                 </header>
 
+                {isTrial && activeTab !== 'billing' && (
+                    <div className="bg-gradient-to-r from-primary-600 to-primary-500 text-white px-6 py-3 shadow-md border-b-4 border-primary-700 flex justify-between items-center z-20">
+                        <div className="flex items-center gap-3">
+                            <Bell className="w-5 h-5 animate-pulse" />
+                            <span className="font-bold text-sm sm:text-base">
+                                {trialDays} days left in your free trial — Upgrade to keep access
+                            </span>
+                        </div>
+                        <button 
+                            onClick={() => setActiveTab('billing')}
+                            className="bg-white text-primary-600 px-4 py-1.5 rounded-lg text-sm font-black hover:bg-primary-50 transition-colors shadow-sm"
+                        >
+                            Upgrade
+                        </button>
+                    </div>
+                )}
+
+
                 <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-secondary-50">
                     <div className="max-w-7xl mx-auto space-y-6">
                         {error && (
@@ -497,6 +567,113 @@ const Dashboard = () => {
                                         </div>
                                     </div>
                                 )}
+                                {/* Day-End Reports Tab */}
+                                {activeTab === 'reports' && (
+                                    <div className="space-y-6 animate-fade-in-up">
+                                        <div className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+                                            <div>
+                                                <h2 className="text-2xl font-black text-secondary-900">Day-End Sales Report</h2>
+                                                <p className="text-secondary-500 mt-1 font-medium">Reconcile revenue and track performance.</p>
+                                            </div>
+                                            <div>
+                                                <input 
+                                                    type="date" 
+                                                    value={reportDate} 
+                                                    onChange={(e) => {
+                                                        setReportDate(e.target.value);
+                                                    }}
+                                                    className="px-4 py-2 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 font-bold text-secondary-700 bg-white"
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {reportLoading ? (
+                                            <div className="py-20 flex justify-center items-center font-bold text-secondary-500 animate-pulse">Running Analytics Engine...</div>
+                                        ) : dailyReport && (
+                                            <>
+                                                {/* Metric Cards */}
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                    <div className="bg-white p-6 rounded-2xl premium-shadow border border-secondary-100">
+                                                        <p className="text-sm font-bold text-secondary-500 uppercase tracking-wider mb-2">Total Revenue</p>
+                                                        <h3 className="text-4xl font-black text-primary-600">₹{dailyReport.totalRevenue}</h3>
+                                                        <div className="mt-4 flex gap-4 text-sm font-bold border-t border-secondary-100 pt-3">
+                                                            <div className="flex-1 text-secondary-600">UPI: <span className="text-secondary-900">₹{(dailyReport.totalRevenue * (dailyReport.byPaymentMethod.upi / (dailyReport.byPaymentMethod.upi + dailyReport.byPaymentMethod.cash || 1))).toFixed(0)}</span></div>
+                                                            <div className="flex-1 text-secondary-600">Cash: <span className="text-secondary-900">₹{(dailyReport.totalRevenue * (dailyReport.byPaymentMethod.cash / (dailyReport.byPaymentMethod.upi + dailyReport.byPaymentMethod.cash || 1))).toFixed(0)}</span></div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white p-6 rounded-2xl premium-shadow border border-secondary-100">
+                                                        <p className="text-sm font-bold text-secondary-500 uppercase tracking-wider mb-2">Total Orders</p>
+                                                        <h3 className="text-4xl font-black text-secondary-900">{dailyReport.totalOrders}</h3>
+                                                        <div className="mt-4 flex gap-4 text-sm font-bold border-t border-secondary-100 pt-3">
+                                                            <div className="flex-1 text-secondary-600">UPI: <span className="text-secondary-900">{dailyReport.byPaymentMethod.upi}</span></div>
+                                                            <div className="flex-1 text-secondary-600">Cash: <span className="text-secondary-900">{dailyReport.byPaymentMethod.cash}</span></div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white p-6 rounded-2xl premium-shadow border border-secondary-100">
+                                                        <p className="text-sm font-bold text-secondary-500 uppercase tracking-wider mb-2">Avg Order Value</p>
+                                                        <h3 className="text-4xl font-black text-secondary-900">₹{dailyReport.avgOrderValue.toFixed(0)}</h3>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                                    <div className="lg:col-span-2 bg-white p-6 rounded-2xl premium-shadow border border-secondary-100">
+                                                        <h3 className="text-lg font-bold text-secondary-900 mb-6">Hourly Volume</h3>
+                                                        <div className="flex items-end gap-2 h-48 mt-4 pt-4 border-t border-secondary-100">
+                                                            {dailyReport.byHour.length === 0 ? (
+                                                                <div className="w-full text-center text-sm font-bold text-secondary-400 mt-10">No volume data for this date.</div>
+                                                            ) : (
+                                                                dailyReport.byHour.map(h => {
+                                                                    const maxRev = Math.max(...dailyReport.byHour.map(hr => hr.revenue));
+                                                                    const percentage = (h.revenue / maxRev) * 100;
+                                                                    return (
+                                                                        <div key={h.hour} className="flex-1 flex flex-col items-center gap-2 group relative">
+                                                                            <div className="w-full bg-primary-50 rounded-lg relative flex items-end justify-center h-40 overflow-hidden border border-primary-100">
+                                                                                <div 
+                                                                                    className="w-full bg-gradient-to-t from-primary-600 to-primary-400 rounded-sm transition-all duration-1000 group-hover:from-primary-500 group-hover:to-primary-300" 
+                                                                                    style={{ height: `${percentage}%` }}
+                                                                                ></div>
+                                                                                <div className="absolute top-2 opacity-0 group-hover:opacity-100 bg-secondary-900 text-white text-[10px] py-1 px-2 rounded font-bold transition-opacity shadow-lg z-10 whitespace-nowrap">
+                                                                                    {h.orders} cmds<br/>₹{h.revenue}
+                                                                                </div>
+                                                                            </div>
+                                                                            <span className="text-[10px] font-bold text-secondary-500">{h.hour}:00</span>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-white p-6 rounded-2xl premium-shadow border border-secondary-100">
+                                                        <h3 className="text-lg font-bold text-secondary-900 mb-6">Top Sellers</h3>
+                                                        <div className="space-y-4">
+                                                            {dailyReport.topItems.length === 0 ? (
+                                                                <div className="text-center text-sm font-bold text-secondary-400 mt-10">No items sold.</div>
+                                                            ) : (
+                                                                dailyReport.topItems.map((item, idx) => (
+                                                                    <div key={idx} className="flex justify-between items-center p-3 bg-secondary-50 rounded-xl border border-secondary-100 shadow-sm">
+                                                                        <div className="overflow-hidden pr-2 flex items-center gap-3">
+                                                                            <span className="font-black text-secondary-400 text-lg">#{idx+1}</span>
+                                                                            <div>
+                                                                                <p className="text-sm font-bold text-secondary-900 whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</p>
+                                                                                <p className="text-xs font-bold text-primary-600">{item.qty} Sold</p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-right flex-shrink-0">
+                                                                            <p className="text-sm font-black text-secondary-900">₹{item.revenue}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Live Orders Tab */}
                                 {activeTab === 'orders' && (
                                     <div className="space-y-6">
@@ -552,11 +729,18 @@ const Dashboard = () => {
                                                         <div key={order._id} className={`bg-white border-2 rounded-2xl shadow-lg overflow-hidden flex flex-col h-full transform transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
                                                             {/* Ticket Header */}
                                                             <div className={`${headerClass} ${textClass} px-5 py-4 flex justify-between items-center shadow-inner`}>
-                                                                <div className="flex flex-col items-start gap-1">
-                                                                    <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm inline-block">
-                                                                        <span className="font-black text-xl tracking-tight">#{order.tokenNumber}</span>
+                                                                <div className="flex flex-col items-start gap-1.5">
+                                                                    <div className="flex gap-2">
+                                                                        <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm inline-block">
+                                                                            <span className="font-black text-xl tracking-tight">#{order.tokenNumber}</span>
+                                                                        </div>
+                                                                        {order.tableNumber && (
+                                                                            <div className="bg-black/90 px-3 py-1.5 rounded-lg backdrop-blur-sm inline-flex items-center shadow-xl">
+                                                                                <span className="font-black text-lg text-white tracking-widest">{order.tableNumber}</span>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-black/20 text-white border border-white/10 shadow-sm">
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-black/20 text-white border border-white/10 shadow-sm mt-1">
                                                                         {order.paymentMethod === 'CASH' ? 'CASH on Delivery' : 'PAID (Online)'}
                                                                     </span>
                                                                 </div>
@@ -588,7 +772,15 @@ const Dashboard = () => {
                                                             <div className="p-5 border-t border-secondary-100 bg-white">
                                                                 <div className="flex justify-between items-center mb-4">
                                                                     <span className="text-secondary-500 font-bold text-sm uppercase tracking-wider">Total Amount</span>
-                                                                    <span className="font-black text-2xl text-secondary-900">₹{order.totalAmount}</span>
+                                                                    <div className="flex flex-col items-end gap-1">
+                                                                        <span className="font-black text-2xl text-secondary-900">₹{order.totalAmount}</span>
+                                                                         <button
+                                                                            onClick={() => window.open(`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000'}/api/public/orders/${order._id}/invoice`, '_blank')}
+                                                                            className="text-[10px] font-black uppercase tracking-widest text-primary-600 hover:text-primary-800 transition-colors bg-primary-50 px-2 py-1 rounded border border-primary-200"
+                                                                        >
+                                                                            Download Invoice
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="grid grid-cols-2 gap-2">
@@ -772,11 +964,13 @@ const Dashboard = () => {
                                                             )}
 
                                                             <div className="pt-4 border-t border-secondary-100 flex justify-between items-center mt-auto">
-                                                                <span className="text-xs font-bold text-secondary-400 uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis max-w-[60%]">
-                                                                    {categories.find(c => c._id === item.categoryId)?.name || 'Uncategorized'}
-                                                                </span>
-                                                                <button className="text-xs font-bold text-primary-600 hover:text-primary-700 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-primary-100">
-                                                                    Edit
+                                                                <label className="text-xs font-bold text-secondary-600 hover:text-secondary-900 bg-secondary-50 px-3 py-1.5 rounded-lg transition-colors border border-secondary-200 cursor-pointer flex items-center gap-2">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                                                    Upload Image
+                                                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(item._id, e.target.files[0])} />
+                                                                </label>
+                                                                <button onClick={() => handleDeleteItem(item._id)} className="text-xs font-bold text-danger-600 hover:text-white hover:bg-danger-500 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-danger-600">
+                                                                    Delete
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -1145,6 +1339,60 @@ const Dashboard = () => {
                                             </div>
                                             <div className="border-t border-secondary-100 pt-6">
                                                 <h4 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
+                                                    Table & Dine-in Settings
+                                                </h4>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-secondary-700 mb-2">Available Tables</label>
+                                                    <p className="text-xs text-secondary-500 mb-3">Add table numbers or identifiers (e.g., T1, T2, Balcony, Takeaway) for customers to select during checkout.</p>
+                                                    <div className="flex gap-2 mb-3">
+                                                        <input 
+                                                            type="text" 
+                                                            id="newTableInput" 
+                                                            placeholder="Add table ID" 
+                                                            className="flex-1 px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 font-medium" 
+                                                            onKeyDown={(e) => {
+                                                                if(e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    const t = e.target.value.trim();
+                                                                    if(t && !settings.tables?.includes(t)) {
+                                                                        setSettings({...settings, tables: [...(settings.tables||[]), t]});
+                                                                        e.target.value = '';
+                                                                    }
+                                                                }
+                                                            }}
+                                                        />
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => {
+                                                                const input = document.getElementById('newTableInput');
+                                                                const t = input.value.trim();
+                                                                if(t && !settings.tables?.includes(t)) {
+                                                                    setSettings({...settings, tables: [...(settings.tables||[]), t]});
+                                                                    input.value = '';
+                                                                }
+                                                            }}
+                                                            className="bg-secondary-900 hover:bg-black text-white px-4 py-2 rounded-xl font-bold transition-colors"
+                                                        >
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {(settings.tables || []).map(t => (
+                                                            <div key={t} className="bg-primary-50 border border-primary-200 px-3 py-1.5 rounded-lg flex items-center gap-2 font-bold text-sm text-primary-900 shadow-sm">
+                                                                {t}
+                                                                <button type="button" onClick={() => setSettings({...settings, tables: settings.tables.filter(tab => tab !== t)})} className="text-primary-500 hover:text-danger-600 hover:bg-danger-50 rounded p-0.5 transition-colors">
+                                                                    <X className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        {(!settings.tables || settings.tables.length === 0) && (
+                                                            <p className="text-secondary-400 text-sm font-medium italic">No tables configured. Customers will skip table selection.</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="border-t border-secondary-100 pt-6">
+                                                <h4 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
                                                     <IndianRupee className="w-5 h-5 text-green-600" /> Payment & UPI Options
                                                 </h4>
                                                 <div>
@@ -1157,6 +1405,48 @@ const Dashboard = () => {
                                                         className="w-full px-4 py-3 bg-green-50/50 border border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 font-bold tracking-wide"
                                                         placeholder="vendor@bank"
                                                     />
+                                                </div>
+                                            </div>
+                                            <div className="border-t border-secondary-100 pt-6">
+                                                <h4 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
+                                                    <MessageSquare className="w-5 h-5 text-green-500" /> WhatsApp Notifications
+                                                </h4>
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between p-4 border border-secondary-200 rounded-xl bg-secondary-50">
+                                                        <div>
+                                                            <p className="font-bold text-secondary-900">Enable WhatsApp Alerts</p>
+                                                            <p className="text-xs text-secondary-500">Receive instant updates for new orders and payments on your phone.</p>
+                                                        </div>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                value="" 
+                                                                className="sr-only peer" 
+                                                                checked={settings.whatsappEnabled || false} 
+                                                                onChange={(e) => setSettings({ ...settings, whatsappEnabled: e.target.checked })}
+                                                            />
+                                                            <div className="w-11 h-6 bg-secondary-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-secondary-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success-500"></div>
+                                                        </label>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-secondary-700 mb-2">WhatsApp Number</label>
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={settings.vendorWhatsApp || ''}
+                                                                onChange={(e) => setSettings({ ...settings, vendorWhatsApp: e.target.value })}
+                                                                className="flex-1 px-4 py-3 bg-secondary-50 border border-secondary-200 rounded-xl focus:ring-2 focus:ring-primary-500 font-bold tracking-wide"
+                                                                placeholder="+91 99999 99999"
+                                                            />
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={handleTestWhatsApp}
+                                                                className="px-6 bg-secondary-800 text-white font-bold rounded-xl hover:bg-black transition-colors whitespace-nowrap focus:outline-none"
+                                                            >
+                                                                Test
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="pt-4 flex gap-4">

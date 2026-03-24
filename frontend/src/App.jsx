@@ -9,6 +9,7 @@ import VendorRegister from './pages/vendor/Register';
 import VendorForgotPassword from './pages/vendor/ForgotPassword';
 import VendorResetPassword from './pages/vendor/ResetPassword';
 import VendorDashboard from './pages/vendor/Dashboard';
+import KOTMonitor from './pages/vendor/KOTMonitor';
 import CustomerMenu from './pages/customer/CustomerMenu';
 import OrderReceipt from './pages/customer/OrderReceipt';
 
@@ -32,6 +33,7 @@ const App = () => {
               <ProtectedRoute>
                 <Routes>
                   <Route path="dashboard" element={<VendorDashboard />} />
+                  <Route path="kot" element={<KOTMonitor />} />
                   <Route path="" element={<Navigate to="dashboard" replace />} />
                 </Routes>
               </ProtectedRoute>

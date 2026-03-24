@@ -5,6 +5,7 @@ const Payment = require('../models/Payment');
 const TokenTracker = require('../models/TokenTracker');
 const Vendor = require('../models/Vendor');
 const MenuItem = require('../models/MenuItem');
+const { deductStock } = require('./inventoryController');
 // Note: io is imported dynamically in index.js, we will pass it via req.app.get('io')
 
 const razorpay = new Razorpay({
@@ -22,6 +23,7 @@ exports.createOrder = async (req, res) => {
         }
 
         // 0. Server-Side Cart Validation (SECURITY)
+        const vendorRecord = await Vendor.findById(vendorId);
         let calculatedSubtotal = 0;
         const verifiedItems = [];
 
@@ -79,11 +81,31 @@ exports.createOrder = async (req, res) => {
 
         await dbOrder.save();
 
+        const { sendWhatsAppMessage } = require('../utils/whatsapp');
+        if (vendorRecord && vendorRecord.whatsappEnabled && vendorRecord.vendorWhatsApp) {
+            const itemString = verifiedItems.map(i => `${i.name} x ${i.quantity}`).join(', ');
+            const msg = `🔔 New Order #${dbOrder.tokenNumber} | Table ${dbOrder.tableNumber || '-'} | ₹${dbOrder.totalAmount} | [${itemString}]`;
+            sendWhatsAppMessage(vendorRecord.vendorWhatsApp, msg);
+            
+            if (paymentMethod === 'UPI') {
+                const confMsg = `✅ Payment confirmed for Order #${dbOrder.tokenNumber} — ₹${dbOrder.totalAmount}`;
+                sendWhatsAppMessage(vendorRecord.vendorWhatsApp, confMsg);
+            }
+        }
+
         if (paymentMethod === 'CASH' || paymentMethod === 'UPI') {
             // We bypass Razorpay, tell the Kitchen immediately!
             const io = req.app.get('io');
             if (io) {
+                await deductStock(vendorId, verifiedItems, io);
                 io.to(`vendor_${vendorId}`).emit('new_order', dbOrder);
+                io.to(`vendor_${vendorId}`).emit('kot_print', {
+                    token: dbOrder.tokenNumber,
+                    tableNumber: dbOrder.tableNumber || '-',
+                    items: dbOrder.items.map(i => ({ name: i.name, qty: i.quantity, note: '' })),
+                    orderTime: dbOrder.createdAt,
+                    orderId: dbOrder._id
+                });
             }
 
             return res.json({
@@ -177,9 +199,23 @@ exports.razorpayWebhook = async (req, res) => {
                     if (orderRecord) {
                         const io = req.app.get('io');
                         if (io) {
+                            await deductStock(orderRecord.vendorId, orderRecord.items, io);
                             io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
+                            io.to(`vendor_${orderRecord.vendorId}`).emit('kot_print', {
+                                token: orderRecord.tokenNumber,
+                                tableNumber: orderRecord.tableNumber || '-',
+                                items: orderRecord.items.map(i => ({ name: i.name, qty: i.quantity, note: '' })),
+                                orderTime: orderRecord.createdAt,
+                                orderId: orderRecord._id
+                            });
                         }
-
+                        
+                        const vendorRecord = await Vendor.findById(orderRecord.vendorId);
+                        const { sendWhatsAppMessage } = require('../utils/whatsapp');
+                        if (vendorRecord && vendorRecord.whatsappEnabled && vendorRecord.vendorWhatsApp) {
+                            const confMsg = `✅ Payment confirmed for Order #${orderRecord.tokenNumber} — ₹${orderRecord.totalAmount}`;
+                            sendWhatsAppMessage(vendorRecord.vendorWhatsApp, confMsg);
+                        }
                     }
                 } else {
                     // It's a Subscription Payment (no orderId attached)
@@ -227,7 +263,15 @@ exports.verifyDemoPayment = async (req, res) => {
         if (orderRecord) {
             const io = req.app.get('io');
             if (io) {
+                await deductStock(orderRecord.vendorId, orderRecord.items, io);
                 io.to(`vendor_${orderRecord.vendorId}`).emit('new_order', orderRecord);
+                io.to(`vendor_${orderRecord.vendorId}`).emit('kot_print', {
+                    token: orderRecord.tokenNumber,
+                    tableNumber: orderRecord.tableNumber || '-',
+                    items: orderRecord.items.map(i => ({ name: i.name, qty: i.quantity, note: i.note || '' })),
+                    orderTime: orderRecord.createdAt,
+                    orderId: orderRecord._id
+                });
             }
 
         }
@@ -259,5 +303,25 @@ exports.getOrderById = async (req, res) => {
     } catch (error) {
         console.error('Fetch order error:', error);
         res.status(500).json({ error: 'Failed to fetch order details' });
+    }
+};
+
+exports.getKOT = async (req, res) => {
+    try {
+        const order = await Order.findOne({ _id: req.params.orderId, vendorId: req.vendorId });
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+        
+        res.json({
+            success: true,
+            kot: {
+                token: order.tokenNumber,
+                tableNumber: order.tableNumber || '-',
+                items: order.items.map(i => ({ name: i.name, qty: i.quantity, note: '' })),
+                orderTime: order.createdAt,
+                orderId: order._id
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error fetching KOT schema' });
     }
 };

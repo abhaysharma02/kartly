@@ -235,6 +235,16 @@ const OrderReceipt = () => {
                     </div>
                 </div>
 
+                {/* PDF Action */}
+                <div className="mt-6 flex justify-center">
+                    <button
+                        onClick={() => window.open(`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000'}/api/public/orders/${order._id}/invoice`, '_blank')}
+                        className="bg-primary-50 text-primary-700 font-bold border border-primary-200 px-6 py-3 rounded-xl shadow-sm hover:bg-primary-100 transition-colors flex items-center gap-2"
+                    >
+                        <Receipt className="w-5 h-5" /> Download Tax Invoice
+                    </button>
+                </div>
+
                 {/* Footer Message */}
                 <div className="text-center pt-4">
                     <p className="text-secondary-400 font-medium text-sm flex items-center justify-center gap-1">

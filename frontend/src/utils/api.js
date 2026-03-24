@@ -24,7 +24,7 @@ api.interceptors.request.use(
     }
 );
 
-// Response interceptor to handle 401 Unauthorized
+// Response interceptor to handle 401 Unauthorized and 402 Payment Required
 api.interceptors.response.use(
     (response) => {
         return response;
@@ -41,6 +41,21 @@ api.interceptors.response.use(
                 window.location.href = '/vendor/login';
             }
         }
+        
+        if (error.response && error.response.status === 402) {
+            // Subscription Expired - Force redirect to Billing ONLY if on dashboard
+            if (!window.location.pathname.startsWith('/q/')) {
+                // Usually window.location.href is a full reload, but it's safe to push them strictly into the dashboard.
+                // It's up to the React Router to handle this or we can just window.location.href it.
+                // We will redirect to /vendor/dashboard where the activeTab acts as billing, but we don't have direct path.
+                // We'll let the components catch it or force a reload if needed, but since activeTab is state,
+                // we'll just throw the error and let Dashboard.jsx handle it via its own catch block
+                // which sets activeTab to 'billing' ideally.
+                // But as a hard fallback:
+                console.error('Subscription expired:', error.response.data);
+            }
+        }
+        
         return Promise.reject(error);
     }
 );

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kartly - Zero Commission QR Food Ordering</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #f59e0b;
+            --primary-hover: #d97706;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        a { text-decoration: none; color: inherit; }
+
+        /* Container & Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        section { padding: 80px 0; }
+
+        /* Navbar */
+        header {
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            color: var(--primary);
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            border: 2px solid var(--primary);
+            transition: all 0.2s;
+        }
+
+        .btn-outline:hover {
+            background-color: var(--primary);
+            color: #fff;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 120px 0 80px;
+        }
+
+        .hero h1 {
+            font-size: clamp(40px, 8vw, 72px);
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero h1 span {
+            color: var(--primary);
+            -webkit-text-fill-color: var(--primary);
+        }
+
+        .hero p {
+            font-size: 20px;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+
+        .hero-image {
+            margin-top: 60px;
+            max-width: 800px;
+            width: 100%;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(245, 158, 11, 0.25);
+            border: 1px solid var(--border);
+        }
+
+        /* Section Titles */
+        .section-title {
+            text-align: center;
+            font-size: 40px;
+            font-weight: 900;
+            margin-bottom: 16px;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 60px;
+            font-size: 18px;
+        }
+
+        /* How it Works */
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+            margin-top: 40px;
+        }
+
+        .step-card {
+            background: var(--bg-card);
+            padding: 40px;
+            border-radius: 24px;
+            text-align: center;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 900;
+            margin: 0 auto 24px;
+        }
+
+        /* Features */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            padding: 32px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .feature-icon {
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 15px;
+        }
+
+        /* Pricing */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 32px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .price-card {
+            background: var(--bg-card);
+            padding: 48px;
+            border-radius: 32px;
+            border: 1px solid var(--border);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .price-card.popular {
+            border: 2px solid var(--primary);
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 768px) {
+            .price-card.popular { transform: scale(1); }
+        }
+
+        .popular-badge {
+            background: var(--primary);
+            color: white;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            padding: 6px 40px;
+            position: absolute;
+            top: 24px;
+            right: -32px;
+            transform: rotate(45deg);
+        }
+
+        .price-card h3 {
+            font-size: 24px;
+            font-weight: 900;
+            margin-bottom: 16px;
+        }
+
+        .price {
+            font-size: 56px;
+            font-weight: 900;
+            margin-bottom: 24px;
+        }
+
+        .price span {
+            font-size: 18px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .features-list {
+            list-style: none;
+            margin-bottom: 40px;
+            text-align: left;
+        }
+
+        .features-list li {
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #e2e8f0;
+        }
+
+        .features-list li i { color: var(--primary); }
+
+        /* Testimonials */
+        .testimonials {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+        }
+
+        .testimonial-card {
+            background: var(--bg-card);
+            padding: 40px;
+            border-radius: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .quote {
+            font-size: 18px;
+            font-style: italic;
+            margin-bottom: 24px;
+            color: #cbd5e1;
+        }
+
+        .author {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .author-info h4 { font-weight: 700; }
+        .author-info p { color: var(--text-muted); font-size: 14px; }
+
+        /* CTA Section */
+        .cta-section {
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            text-align: center;
+            padding: 100px 24px;
+            border-radius: 32px;
+            margin: 80px 24px;
+        }
+
+        .cta-section h2 {
+            font-size: 48px;
+            font-weight: 900;
+            color: white;
+            margin-bottom: 24px;
+        }
+
+        .cta-section p {
+            font-size: 20px;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 40px;
+        }
+
+        .cta-section .btn-primary {
+            background: white;
+            color: var(--primary-hover);
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 60px 0;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .footer-links a:hover { color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="container nav-content">
+            <div class="logo">
+                <i data-lucide="store"></i> Kartly
+            </div>
+            <div>
+                <a href="/login" class="btn-outline" style="margin-right: 12px; padding: 10px 20px;">Login</a>
+                <a href="/register" class="btn-primary" style="padding: 10px 20px;">Get Started</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero container">
+        <h1>Your menu. Your QR.<br><span>Zero commission.</span></h1>
+        <p>Transform your restaurant with a completely native QR ordering system. Customers scan, order, and pay directly to your bank account via UPI.</p>
+        <a href="/register" class="btn-primary" style="font-size: 18px; padding: 16px 32px;">Start Free Trial — No card required</a>
+        <br>
+        <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80" alt="Kartly Dashboard Demo" class="hero-image">
+    </section>
+
+    <!-- How it Works -->
+    <section class="container">
+        <h2 class="section-title">How It Works</h2>
+        <p class="section-subtitle">Set up your entire restaurant operation in just 3 minutes.</p>
+        
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <i data-lucide="printer" style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 24px;"></i>
+                <h3>Print Your QR</h3>
+                <p style="color: var(--text-muted); margin-top: 12px;">Create your menu. Download your high-quality vector QR code and stick it on your tables.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <i data-lucide="smartphone" style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 24px;"></i>
+                <h3>Customer Scans</h3>
+                <p style="color: var(--text-muted); margin-top: 12px;">Customers simply scan with their phone. No app downloads required. They browse the menu effortlessly.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <i data-lucide="indian-rupee" style="width: 48px; height: 48px; color: var(--primary); margin-bottom: 24px;"></i>
+                <h3>Money Hits Your UPI</h3>
+                <p style="color: var(--text-muted); margin-top: 12px;">Orders are paid via direct UPI Intent. 0% gateways. 100% of the money settles instantly into your bank.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="container">
+        <h2 class="section-title">Everything You Need</h2>
+        <p class="section-subtitle">A premium SaaS suite tailored specifically for Indian F&B outlets.</p>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <i data-lucide="qr-code" class="feature-icon" style="width: 32px; height: 32px;"></i>
+                <h3>Premium QR Ordering</h3>
+                <p>Lightning-fast mobile-first layout that looks like Zomato/Swiggy without the commission fees.</p>
+            </div>
+            <div class="feature-card">
+                <i data-lucide="layout-dashboard" class="feature-icon" style="width: 32px; height: 32px;"></i>
+                <h3>Live Web Dashboard</h3>
+                <p>Manage incoming orders instantly with an active sound alert WebSocket powered display panel.</p>
+            </div>
+            <div class="feature-card">
+                <i data-lucide="wallet" class="feature-icon" style="width: 32px; height: 32px;"></i>
+                <h3>UPI Direct Payments</h3>
+                <p>Native integration with GPay, PhonePe, and Paytm. Settlement delays are a thing of the past.</p>
+            </div>
+            <div class="feature-card">
+                <i data-lucide="receipt" class="feature-icon" style="width: 32px; height: 32px;"></i>
+                <h3>GST Invoicing</h3>
+                <p>Auto-generate HSN compliant PDF invoices with CGST/SGST splits for every single successful order.</p>
+            </div>
+            <div class="feature-card">
+                <i data-lucide="printer" class="feature-icon" style="width: 32px; height: 32px;"></i>
+                <h3>KOT Printer Integration</h3>
+                <p>Automatically pushes KOT tickets to your kitchen's 80mm thermal dot-matrix printer over WebSockets.</p>
+            </div>
+            <div class="feature-card">
+                <i data-lucide="bar-chart-3" class="feature-icon" style="width: 32px; height: 32px;"></i>
+                <h3>Sales Reports</h3>
+                <p>Export daily breakdowns of peak hours, top-selling inventory items, and P&L analytics easily.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section class="container" id="pricing">
+        <h2 class="section-title">Transparent Pricing</h2>
+        <p class="section-subtitle">Stop giving away 30% of your revenue. Just a simple flat fee.</p>
+        
+        <div class="pricing-grid">
+            <div class="price-card">
+                <h3>Starter</h3>
+                <div class="price">₹499<span>/mo</span></div>
+                <ul class="features-list">
+                    <li><i data-lucide="check"></i> 1 Store Outlet</li>
+                    <li><i data-lucide="check"></i> Unlimited Orders</li>
+                    <li><i data-lucide="check"></i> Zero Commission UPI</li>
+                    <li><i data-lucide="check"></i> Live Dashboard</li>
+                    <li><i data-lucide="check"></i> Basic Email Support</li>
+                </ul>
+                <a href="/register" class="btn-outline" style="width: 100%;">Start 14-Day Free Trial</a>
+            </div>
+            
+            <div class="price-card popular">
+                <div class="popular-badge">Most Popular</div>
+                <h3>Pro Tier</h3>
+                <div class="price">₹999<span>/mo</span></div>
+                <ul class="features-list">
+                    <li><i data-lucide="check"></i> Unlimited Outlets</li>
+                    <li><i data-lucide="check"></i> Everything in Starter</li>
+                    <li><i data-lucide="check"></i> Inventory Deduction System</li>
+                    <li><i data-lucide="check"></i> GST Reports & PDF KOTs</li>
+                    <li><i data-lucide="check"></i> Priority WhatsApp Support</li>
+                </ul>
+                <a href="/register" class="btn-primary" style="width: 100%;">Get Priority Access</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="container">
+        <h2 class="section-title">Trusted by Modern Cafes</h2>
+        <p class="section-subtitle">Real feedback from restaurant owners scaling with Kartly.</p>
+        
+        <div class="testimonials">
+            <div class="testimonial-card">
+                <p class="quote">"Ever since moving our weekend rush off aggregator apps and onto Kartly QR codes, our net margins have exploded. Customers love not having to download an app!"</p>
+                <div class="author">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--border);"></div>
+                    <div class="author-info">
+                        <h4>Aman Gupta</h4>
+                        <p>Owner, The Roast House</p>
+                    </div>
+                </div>
+            </div>
+            <div class="testimonial-card">
+                <p class="quote">"The direct UPI intent and 0% gateway fees is a game changer. All payments settle directly into my current account instantly. Plus the automated KOT printing saves us tons of time."</p>
+                <div class="author">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--border);"></div>
+                    <div class="author-info">
+                        <h4>Priya Reddy</h4>
+                        <p>Manager, Spice Route</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <div class="cta-section">
+        <h2>Ready to skip the 30% aggregator tax?</h2>
+        <p>Join hundreds of smart restaurant owners maximizing their margins.</p>
+        <a href="/register" class="btn-primary" style="font-size: 20px; padding: 20px 40px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">Start Free Trial — No card required</a>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="logo" style="justify-content: center; margin-bottom: 24px;">
+                <i data-lucide="store"></i> Kartly
+            </div>
+            <div class="footer-links">
+                <a href="#">Contact Support</a>
+                <a href="https://wa.me/919999999999">WhatsApp Us</a>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+            </div>
+            <p>&copy; 2026 Kartly Systems Inc. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

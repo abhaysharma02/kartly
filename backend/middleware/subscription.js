@@ -1,36 +1,42 @@
 const Subscription = require('../models/Subscription');
+const Vendor = require('../models/Vendor');
 
 const requireActiveSubscription = async (req, res, next) => {
     try {
-        const vendorId = req.vendorId || req.params.vendorId || req.body.vendorId;
+        const vendorId = req.vendorId || req.params.vendorId || req.body.vendorId || req.query.vendorId;
 
         if (!vendorId) {
             return res.status(400).json({ error: 'Vendor ID is required to check subscription.' });
         }
 
-        /*
+        const vendor = await Vendor.findById(vendorId);
+        if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+        // Calculate if within 14-day trial
+        const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
+        const isTrial = (new Date() - new Date(vendor.createdAt)) < fourteenDaysMs;
+
+        if (isTrial) {
+            req.isTrial = true;
+            return next();
+        }
+
+        // Must check explicit subscription
         const activeSub = await Subscription.findOne({
             vendorId: vendorId,
-            status: { $in: ['ACTIVE', 'TRIAL'] }
+            status: 'ACTIVE'
         });
 
-        if (!activeSub) {
-            return res.status(403).json({
-                error: 'Subscription Inactive',
-                message: 'This vendor does not have an active subscription.'
-            });
+        if (activeSub && new Date(activeSub.endDate) > new Date()) {
+            return next();
         }
 
-        if (new Date(activeSub.endDate) < new Date()) {
-            // It's technically expired, though the cron job might not have run yet.
-            return res.status(403).json({
-                error: 'Subscription Expired',
-                message: 'This vendor\'s subscription has expired.'
-            });
-        }
-        */
+        return res.status(402).json({
+            error: 'subscription_required',
+            upgradeUrl: '/dashboard/billing',
+            message: 'Store is temporarily unavailable. Subscription Inactive.'
+        });
 
-        next();
     } catch (error) {
         console.error('Subscription check error:', error);
         res.status(500).json({ error: 'Internal server error during subscription check' });

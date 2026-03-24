@@ -25,6 +25,7 @@ const orderSchema = new mongoose.Schema({
     },
     tokenNumber: { type: Number, required: true },
     customerPhone: { type: String, required: false },
+    tableNumber: { type: String, required: false },
     items: [orderItemSchema],
     subtotal: { type: Number, required: true },
     taxAmount: { type: Number, required: true },

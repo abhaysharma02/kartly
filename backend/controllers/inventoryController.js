@@ -84,8 +84,11 @@ const deleteInventoryItem = async (req, res) => {
 };
 
 // @desc    Deduct stock when an order is successful
-const deductStock = async (vendorId, items) => {
+const deductStock = async (vendorId, items, io) => {
     try {
+        const MenuItem = require('../models/MenuItem');
+        let inventoryDepleted = false;
+
         for (const item of items) {
             if (!item.inventoryItemId) continue; // Skip items that aren't mapped to inventory
 
@@ -99,7 +102,20 @@ const deductStock = async (vendorId, items) => {
                 const newQuantity = Math.max(0, inventoryItem.quantity - item.quantity);
                 inventoryItem.quantity = newQuantity;
                 await inventoryItem.save();
+
+                // If stock hits 0, disable linked menu items
+                if (newQuantity === 0) {
+                    await MenuItem.updateMany(
+                        { vendorId, inventoryItemId: inventoryItem._id },
+                        { $set: { isAvailable: false } }
+                    );
+                    inventoryDepleted = true;
+                }
             }
+        }
+
+        if (inventoryDepleted && io) {
+            io.to(`vendor_${vendorId}`).emit('menu_updated');
         }
     } catch (err) {
         console.error('Failed to deduct stock:', err);
@@ -107,8 +123,11 @@ const deductStock = async (vendorId, items) => {
 };
 
 // @desc    Revert stock if an order is cancelled
-const revertStock = async (vendorId, items) => {
+const revertStock = async (vendorId, items, io) => {
     try {
+        const MenuItem = require('../models/MenuItem');
+        let inventoryRestored = false;
+
         for (const item of items) {
             if (!item.inventoryItemId) continue;
 
@@ -118,9 +137,22 @@ const revertStock = async (vendorId, items) => {
             });
 
             if (inventoryItem) {
+                const wasZero = inventoryItem.quantity === 0;
                 inventoryItem.quantity = inventoryItem.quantity + item.quantity;
                 await inventoryItem.save();
+
+                if (wasZero && inventoryItem.quantity > 0) {
+                    await MenuItem.updateMany(
+                        { vendorId, inventoryItemId: inventoryItem._id },
+                        { $set: { isAvailable: true } }
+                    );
+                    inventoryRestored = true;
+                }
             }
+        }
+        
+        if (inventoryRestored && io) {
+            io.to(`vendor_${vendorId}`).emit('menu_updated');
         }
     } catch (err) {
         console.error('Failed to revert stock:', err);

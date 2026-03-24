@@ -6,6 +6,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 
 const startCronJobs = require('./utils/cronJobs');
@@ -39,6 +40,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(morgan('dev'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Rate Limiting
 const apiLimiter = rateLimit({
@@ -54,6 +56,18 @@ app.use('/api/auth', authRoutes);
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
+
+// Explicit root mount for Table Fetching
+app.get('/api/store/:vendorId/tables', async (req, res) => {
+    try {
+        const Vendor = require('./models/Vendor');
+        const vendor = await Vendor.findById(req.params.vendorId).select('tables');
+        if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+        res.json({ success: true, tableList: vendor.tables || [] });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed' });
+    }
+});
 
 // Database Connection
 mongoose.connect(process.env.MONGODB_URI)
