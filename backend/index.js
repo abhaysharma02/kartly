@@ -19,12 +19,26 @@ const webhookRoutes = require('./routes/webhookRoutes');
 const app = express();
 const server = http.createServer(app);
 
+const allowedOrigins = [
+    'https://kartly.nestely.in', 
+    'https://pos.nestely.in',
+    process.env.FRONTEND_URL
+].filter(Boolean);
+
+const checkOrigin = (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    if (origin.endsWith('.vercel.app') || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+};
+
 const io = new Server(server, {
     cors: {
-        origin: process.env.NODE_ENV === 'production'
-            ? ['https://kartly.nestely.in', 'https://pos.nestely.in']
-            : '*',
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        origin: checkOrigin,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        credentials: true
     },
 });
 
@@ -34,9 +48,8 @@ app.set('io', io);
 // Middleware
 app.use(helmet());
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production'
-        ? ['https://kartly.nestely.in', 'https://pos.nestely.in']
-        : '*'
+    origin: checkOrigin,
+    credentials: true,
 }));
 app.use(express.json());
 app.use(morgan('dev'));
