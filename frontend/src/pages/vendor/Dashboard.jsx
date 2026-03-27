@@ -20,7 +20,8 @@ import {
     PackageOpen,
     Trash2,
     IndianRupee,
-    MessageSquare
+    MessageSquare,
+    TrendingUp
 } from 'lucide-react';
 import OnboardingWizard from './OnboardingWizard';
 
