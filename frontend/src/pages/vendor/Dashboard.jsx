@@ -23,6 +23,7 @@ import {
     MessageSquare,
     TrendingUp
 } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 import OnboardingWizard from './OnboardingWizard';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
@@ -173,17 +174,17 @@ const Dashboard = () => {
                 setMenuItems(menuItems.map(i => i._id === itemId ? { ...i, imageUrl: res.data.imageUrl } : i));
             }
         } catch (err) {
-            alert('Image upload failed');
+            toast.error('Image upload failed');
         }
     };
 
     const handleDeleteItem = async (itemId) => {
-        if (!window.confirm('Delete this menu item completely?')) return;
         try {
             await api.delete(`/vendor/menu-items/${itemId}`);
             setMenuItems(menuItems.filter(i => i._id !== itemId));
+            toast.success('Item deleted successfully');
         } catch (err) {
-            alert('Failed to delete item.');
+            toast.error(err.response?.data?.error || 'Failed to delete item.');
         }
     };
 
@@ -204,21 +205,21 @@ const Dashboard = () => {
             setLoading(true);
             const res = await api.put('/vendor/settings', settings);
             setSettings(res.data.settings);
-            alert('Settings completely saved!');
+            toast.success('Settings completely saved!');
         } catch (err) {
-            setError('Failed to update Settings: ' + err.message);
+            toast.error(err.response?.data?.error || 'Failed to update Settings: Request failed');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteInventory = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this item?')) return;
         try {
             await api.delete(`/vendor/inventory/${id}`);
             fetchData();
+            toast.success('Inventory item deleted');
         } catch (err) {
-            setError('Failed to delete inventory item');
+            toast.error('Failed to delete inventory item');
         }
     };
 
@@ -264,7 +265,7 @@ const Dashboard = () => {
                     URL.revokeObjectURL(downloadUrl);
                 }, 'image/png');
                 
-                alert('QR Code Downloaded Successfully!');
+                toast.success('QR Code Downloaded Successfully!');
             };
             img.src = objectUrl;
             
@@ -302,7 +303,7 @@ const Dashboard = () => {
                 description: `Upgrade to ${planInfo.name} Plan for 30 Days`,
                 order_id: razorpayOrderId,
                 handler: function (response) {
-                    alert('Renewal processed! Razorpay Webhook will update your backend status shortly.');
+                    toast.success('Renewal processed! Razorpay Webhook will update your backend status shortly.');
                     setTimeout(fetchData, 3000);
                 },
                 theme: { color: '#f59e0b' }
@@ -310,7 +311,7 @@ const Dashboard = () => {
 
             const rzp = new window.Razorpay(options);
             rzp.on('payment.failed', function (response) {
-                alert('Payment failed. Please try again.');
+                toast.error('Payment failed. Please try again.');
             });
             rzp.open();
         } catch (err) {
@@ -323,12 +324,16 @@ const Dashboard = () => {
 
     const handleTestWhatsApp = async () => {
         try {
-            // Ensure settings are saved first before triggering backend test
+            if (!settings.vendorWhatsApp || settings.vendorWhatsApp.length !== 10) {
+                 return toast.error('Please enter a valid 10-digit WhatsApp number.');
+            }
             await api.put('/vendor/settings', settings);
             const res = await api.post('/vendor/settings/whatsapp-test');
-            alert(res.data.message || 'Test message sent!');
+            toast.success(res.data.message || 'Test message sent!');
         } catch (err) {
-            alert(err.response?.data?.error || 'Failed to send WhatsApp test message. Please ensure the number is valid.');
+            // Fallback to wa.me link directly (no error shown to the user if API fails)
+            const waLink = `https://wa.me/91${settings.vendorWhatsApp}?text=Test%20Message`;
+            window.open(waLink, '_blank');
         }
     };
 
@@ -351,6 +356,7 @@ const Dashboard = () => {
 
     return (
         <div className="min-h-screen bg-secondary-50 flex">
+            <Toaster position="top-right" />
             {/* Mobile Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
@@ -1039,7 +1045,7 @@ const Dashboard = () => {
                                                     <button
                                                         onClick={() => {
                                                             navigator.clipboard.writeText(qrData);
-                                                            alert("Link copied to clipboard!");
+                                                            toast.success("Link copied to clipboard!");
                                                         }}
                                                         className="w-full text-primary-600 hover:text-primary-700 font-bold text-sm bg-primary-50 py-3 rounded-xl transition-colors"
                                                     >
